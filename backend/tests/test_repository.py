@@ -35,10 +35,9 @@ def make_capture(settings, item, artifacts, role="gallery", sha="a" * 64):
         sha256=sha,
         width=32,
         height=32,
-        hand_found=True,
         mask_found=True,
         mask_status="ok",
-        localization={"hand": {}, "selection": {}},
+        localization={"status": "ok", "selection": {}},
     )
 
 
@@ -56,8 +55,8 @@ def test_embedding_round_trip(tmp_path):
     settings, item, artifacts = setup_item(tmp_path)
     capture = make_capture(settings, item, artifacts)
     vector = np.linspace(0, 1, 384, dtype=np.float32)
-    upsert_embedding(settings, capture.id, "v2", "dinov2-small", "prep-v1", vector)
-    loaded = get_embedding(settings, capture.id, "v2", "dinov2-small", "prep-v1")
+    upsert_embedding(settings, capture.id, "v0", "dinov2-small", "prep-v1", vector)
+    loaded = get_embedding(settings, capture.id, "v0", "dinov2-small", "prep-v1")
     assert loaded is not None
     assert np.allclose(loaded, vector)
-    assert get_embedding(settings, capture.id, "v3", "clip", "prep-v1") is None
+    assert get_embedding(settings, capture.id, "v1", "dinov2-small", "prep-v1") is None

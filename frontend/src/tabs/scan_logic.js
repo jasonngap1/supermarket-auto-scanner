@@ -1,51 +1,95 @@
-export function bestTop(variants) {
-  return (
-    variants
-      .flatMap((variant) => variant.top_items || [])
-      .sort((a, b) => b.score - a.score)[0] || null
-  );
+export const ADD_SCORE = 0.8;
+export const RELEASE_SCORE = 0.6;
+export const RELEASE_FRAMES = 3;
+export const SWITCH_FRAMES = 3;
+
+export function createScanState() {
+  return {
+    lockedItemId: null,
+    lowFrames: 0,
+    switchItemId: null,
+    switchFrames: 0,
+  };
 }
 
-function maskVariants(variants) {
-  return variants.filter((variant) => ["v2", "v3"].includes(variant.variant));
+export function bestTop(body) {
+  return body?.top_items?.[0] || null;
 }
 
-function handVariants(variants) {
-  return variants.filter((variant) => variant.variant === "v1");
-}
-
-function allFailed(variants, statuses) {
-  return variants.length > 0 && variants.every((v) => statuses.includes(v.status));
-}
-
-export function statusMessage(body) {
-  const variants = body.variants || [];
-  const masks = maskVariants(variants);
-  if (masks.length) {
-    if (allFailed(masks, ["model_error"])) return "Models unavailable — check /api/health.";
-    if (allFailed(masks, ["mask_rejected", "model_error"])) {
-      return "Item not found — hold it in the centre of the frame.";
+/**
+ * One scan observation -> next gate state plus an item to add once.
+ * A gate stays locked until the visible item disappears for RELEASE_FRAMES,
+ * or a different item wins for SWITCH_FRAMES.
+ */
+export function observeScan(state, best) {
+  if (state.lockedItemId == null) {
+    if (best && best.score >= ADD_SCORE) {
+      return {
+        state: {
+          ...createScanState(),
+          lockedItemId: best.item_id,
+        },
+        added: best,
+        released: false,
+      };
     }
-    return "OK";
+    return { state, added: null, released: false };
   }
-  const hands = handVariants(variants);
-  if (hands.length) {
-    if (allFailed(hands, ["no_hand", "model_error"])) {
-      return "No hand detected — hold the item up to the camera.";
-    }
-  }
-  return "OK";
-}
 
-export function isErrorStatus(body) {
-  const variants = body.variants || [];
-  const masks = maskVariants(variants);
-  if (masks.length) {
-    return allFailed(masks, ["mask_rejected", "model_error"]);
+  if (!best || best.score < RELEASE_SCORE) {
+    const lowFrames = state.lowFrames + 1;
+    if (lowFrames >= RELEASE_FRAMES) {
+      return {
+        state: { ...createScanState() },
+        added: null,
+        released: true,
+      };
+    }
+    return {
+      state: {
+        ...state,
+        lowFrames,
+        switchItemId: null,
+        switchFrames: 0,
+      },
+      added: null,
+      released: false,
+    };
   }
-  const hands = handVariants(variants);
-  if (hands.length) {
-    return allFailed(hands, ["no_hand", "model_error"]);
+
+  if (best.item_id !== state.lockedItemId && best.score >= ADD_SCORE) {
+    const sameCandidate = state.switchItemId === best.item_id;
+    const switchFrames = sameCandidate ? state.switchFrames + 1 : 1;
+    if (switchFrames >= SWITCH_FRAMES) {
+      return {
+        state: {
+          ...createScanState(),
+          lockedItemId: best.item_id,
+        },
+        added: best,
+        released: false,
+      };
+    }
+    return {
+      state: {
+        ...state,
+        lowFrames: 0,
+        switchItemId: best.item_id,
+        switchFrames,
+      },
+      added: null,
+      released: false,
+    };
   }
-  return false;
+
+  return {
+    state: {
+      ...state,
+      lowFrames: 0,
+      switchItemId: null,
+      switchFrames: 0,
+    },
+    added: null,
+    released: false,
+  };
 }

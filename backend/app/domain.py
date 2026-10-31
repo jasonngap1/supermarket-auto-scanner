@@ -11,7 +11,7 @@ class Item:
     price_cents: int
     created_at: str
     gallery_count: int = 0
-    test_count: int = 0
+    thumb_rel_path: str | None = None
 
 
 @dataclass(frozen=True)
@@ -39,3 +39,4 @@ class TopItem:
     name: str
     price_cents: int
     score: float
+    thumb_rel_path: str | None = None

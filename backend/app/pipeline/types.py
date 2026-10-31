@@ -4,13 +4,6 @@ import numpy as np
 
 
 @dataclass(frozen=True)
-class HandObservation:
-    landmarks_px: list[tuple[float, float]]
-    bbox: tuple[float, float, float, float]
-    score: float
-
-
-@dataclass(frozen=True)
 class FaceObservation:
     bbox: tuple[float, float, float, float]
     score: float
@@ -42,10 +35,9 @@ class MaskSelection:
 
 @dataclass(frozen=True)
 class Localization:
-    hand: HandObservation | None
     prompt: PromptSpec | None
     selection: MaskSelection
     mask: np.ndarray | None
-    status: str  # ok | no_hand | mask_rejected | model_error
+    status: str  # ok | mask_rejected | model_error
     timings_ms: dict[str, float] = field(default_factory=dict)
     face: FaceObservation | None = None

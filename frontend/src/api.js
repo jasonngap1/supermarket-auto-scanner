@@ -26,14 +26,14 @@ export const createItem = (name, priceCents) =>
 export const deleteItem = (itemId) =>
   fetch(`/api/items/${itemId}`, { method: "DELETE" });
 
-export const getCaptures = (itemId, role) =>
-  jsonFetch(`/api/items/${itemId}/captures${role ? `?role=${role}` : ""}`);
+export const getCaptures = (itemId) =>
+  jsonFetch(`/api/items/${itemId}/captures?role=gallery`);
 
-export async function uploadCaptures(itemId, role, sessionId, blobs) {
+export async function uploadCaptures(itemId, sessionId, blobs) {
   const form = new FormData();
   for (const blob of blobs) form.append("files", blob, "frame.jpg");
   return jsonFetch(
-    `/api/items/${itemId}/captures?role=${role}&session_id=${encodeURIComponent(sessionId)}`,
+    `/api/items/${itemId}/captures?role=gallery&session_id=${encodeURIComponent(sessionId)}`,
     { method: "POST", body: form },
   );
 }
@@ -41,19 +41,8 @@ export async function uploadCaptures(itemId, role, sessionId, blobs) {
 export const deleteCapture = (itemId, captureId) =>
   fetch(`/api/items/${itemId}/captures/${captureId}`, { method: "DELETE" });
 
-export async function analyzeFrame(blob, variants) {
+export async function scanFrame(blob) {
   const form = new FormData();
   form.append("image", blob, "frame.jpg");
-  form.append("variants", variants.join(","));
-  return jsonFetch("/api/analyze", { method: "POST", body: form });
+  return jsonFetch("/api/scan", { method: "POST", body: form });
 }
-
-export const startEvaluation = (variants) =>
-  jsonFetch("/api/evaluations", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ variants }),
-  });
-
-export const getEvaluation = (runId) => jsonFetch(`/api/evaluations/${runId}`);
-export const listEvaluations = () => jsonFetch("/api/evaluations");

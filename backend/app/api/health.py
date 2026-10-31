@@ -10,11 +10,10 @@ def health(request: Request) -> dict:
     body = {
         "status": "ok",
         "device": {"preference": settings.device},
-        "assets": {"hand_landmarker": settings.hand_asset.exists()},
+        "assets": {"face_detector": settings.face_asset.exists()},
     }
     if state.registry is not None:
         registry_status = state.registry.status()
         body["device"].update(registry_status["device"])
-        body["localizer"] = registry_status.get("localizer")
         body["models"] = registry_status["models"]
     return body

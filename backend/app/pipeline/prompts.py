@@ -1,19 +1,4 @@
-import math
-
 from app.pipeline.types import PromptSpec
-
-NEGATIVE_INDICES = (0, 5, 9, 13, 17)
-
-
-def _mid(a, b):
-    return ((a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0)
-
-
-def _mean(points):
-    return (
-        sum(p[0] for p in points) / len(points),
-        sum(p[1] for p in points) / len(points),
-    )
 
 
 def _clip_point(point, width, height):
@@ -28,28 +13,6 @@ def clip_box(box, width, height):
     x1, y1 = _clip_point((x1, y1), width, height)
     x2, y2 = _clip_point((x2, y2), width, height)
     return (min(x1, x2), min(y1, y2), max(x1, x2), max(y1, y2))
-
-
-def hand_bbox(landmarks):
-    xs = [p[0] for p in landmarks]
-    ys = [p[1] for p in landmarks]
-    return (min(xs), min(ys), max(xs), max(ys))
-
-
-def hand_scale(landmarks):
-    x1, y1, x2, y2 = hand_bbox(landmarks)
-    return max(x2 - x1, y2 - y1)
-
-
-def _expand_box(box, margin, width, height):
-    x1, y1, x2, y2 = box
-    return clip_box((x1 - margin, y1 - margin, x2 + margin, y2 + margin), width, height)
-
-
-def hand_crop_box(landmarks_px, frame_w, frame_h, expand=0.35):
-    box = hand_bbox(landmarks_px)
-    margin = expand * max(box[2] - box[0], box[3] - box[1])
-    return _expand_box(box, margin, frame_w, frame_h)
 
 
 def center_roi_box(
@@ -72,12 +35,7 @@ def build_center_prompt(
     roi_height: float = 0.70,
     face_bbox: tuple[float, float, float, float] | None = None,
 ) -> PromptSpec:
-    """Point + box prompt for an item held at the centre of the frame.
-
-    The centre point is a hard object anchor; the box gives the segmenter the
-    expected extent. Background corners and a visible face are negative
-    prompts, so the segmenter prefers the item.
-    """
+    """Point + box prompt for an item held at the centre of the frame."""
     roi = center_roi_box(frame_w, frame_h, roi_width, roi_height)
     positive = (frame_w / 2.0, frame_h / 2.0)
     negatives = background_negative_points(frame_w, frame_h)
@@ -155,68 +113,3 @@ def face_negative_points(
         (ax, by),
         (bx, by),
     ]
-
-
-def build_sam3_prompt(
-    frame_w: int,
-    frame_h: int,
-    text: str,
-    *,
-    include_box: bool = True,
-    roi_width: float = 0.60,
-    roi_height: float = 0.70,
-) -> PromptSpec:
-    """Text concept prompt for SAM3, optionally anchored to a centred ROI box.
-
-    SAM3 uses text concepts rather than hand-derived points. The box is only a
-    localisation hint; the search region is also used to rank the returned
-    instances.
-    """
-    roi = center_roi_box(frame_w, frame_h, roi_width, roi_height)
-    return PromptSpec(
-        positive_points=[],
-        negative_points=[],
-        box=roi if include_box else None,
-        mode="sam3_center",
-        text=text,
-    )
-
-
-def build_prompt(
-    landmarks_px,
-    frame_w,
-    frame_h,
-    *,
-    mode="pinch_roi",
-    pinch_close_ratio=0.35,
-    box_expand=0.35,
-) -> PromptSpec:
-    if len(landmarks_px) != 21:
-        raise ValueError("Expected 21 hand landmarks")
-
-    landmarks = [_clip_point(p, frame_w, frame_h) for p in landmarks_px]
-    palm_center = _mean([landmarks[i] for i in NEGATIVE_INDICES])
-    pinch_center = _mid(landmarks[4], landmarks[8])
-    grasp_center = _mid(landmarks[4], _mid(landmarks[8], landmarks[12]))
-    scale = hand_scale(landmarks)
-    pinch_distance = math.dist(landmarks[4], landmarks[8])
-    positive = grasp_center if pinch_distance < pinch_close_ratio * scale else pinch_center
-    negative = [landmarks[i] for i in NEGATIVE_INDICES] + [palm_center]
-    negative = list(dict.fromkeys(negative))
-
-    if mode == "none":
-        box = None
-    elif mode == "hand_expanded":
-        box = hand_crop_box(landmarks, frame_w, frame_h, box_expand)
-    elif mode == "pinch_roi":
-        roi = hand_bbox([landmarks[4], landmarks[8], landmarks[12], palm_center])
-        box = _expand_box(roi, box_expand * scale, frame_w, frame_h)
-    else:
-        raise ValueError(f"Unknown prompt mode: {mode}")
-
-    return PromptSpec(
-        positive_points=[positive],
-        negative_points=negative,
-        box=box,
-        mode=mode,
-    )

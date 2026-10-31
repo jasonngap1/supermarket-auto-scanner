@@ -3,36 +3,40 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Supermarket Auto-Scanner Lab</title>
+    <title>Supermarket Auto-Scanner</title>
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
     <header>
-      <h1>Supermarket Auto-Scanner Lab</h1>
+      <h1>Supermarket Auto-Scanner</h1>
       <nav>
         <button data-tab="scan" class="active">Scan</button>
-        <button data-tab="enroll">Enroll</button>
-        <button data-tab="evaluate">Evaluate</button>
+        <button data-tab="enroll">Items</button>
       </nav>
     </header>
 
     <main>
       <section id="tab-scan" class="tab active">
-        <div class="grid two">
-          <div>
+        <div class="scan-layout">
+          <div class="camera-panel">
             <video id="scan-video" autoplay playsinline muted></video>
-            <div class="row">
-              <button id="scan-analyze">Analyze now</button>
-              <label><input id="scan-auto" type="checkbox" /> Auto (~1 fps)</label>
+            <div id="scan-status" class="scan-status">Starting camera…</div>
+          </div>
+
+          <aside class="cart-panel">
+            <div class="cart-header">
+              <div>
+                <h2>Current order</h2>
+                <span id="cart-count" class="muted"></span>
+              </div>
+              <button id="cart-clear" type="button">Clear</button>
             </div>
-            <div id="scan-variants" class="chips"></div>
-            <div id="scan-status" class="status"></div>
-          </div>
-          <div>
-            <img id="scan-annotated" alt="Annotated frame" />
-            <div id="scan-results"></div>
-            <pre id="scan-timings"></pre>
-          </div>
+            <div id="cart-lines" class="cart-lines"></div>
+            <div class="cart-total">
+              <span>Total</span>
+              <strong id="cart-total">$0.00</strong>
+            </div>
+          </aside>
         </div>
       </section>
 
@@ -53,8 +57,7 @@
                 <button id="enroll-new-session" type="button">New session</button>
               </div>
               <div class="row">
-                <button type="button" data-role="gallery">Capture gallery</button>
-                <button type="button" data-role="test">Capture test</button>
+                <button id="enroll-capture" type="button">Capture gallery</button>
                 <button id="enroll-delete-item" type="button" class="danger">Delete item</button>
               </div>
               <div id="enroll-status" class="status"></div>
@@ -65,17 +68,6 @@
             </div>
           </div>
         </div>
-      </section>
-
-      <section id="tab-evaluate" class="tab">
-        <div class="row">
-          <button id="eval-run">Run evaluation</button>
-          <span class="muted">Batch only — scores held-out test captures.</span>
-        </div>
-        <div id="eval-variants" class="chips"></div>
-        <div id="evaluate-status" class="status"></div>
-        <div id="eval-results"></div>
-        <div id="eval-failures"></div>
       </section>
     </main>
 

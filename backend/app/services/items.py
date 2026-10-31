@@ -24,31 +24,31 @@ def create_item(settings: Settings, name: str, price_cents: int) -> Item:
     return item
 
 
+def _item_query(where: str = "") -> str:
+    return f"""
+        SELECT i.id, i.name, i.price_cents, i.created_at,
+               COALESCE(SUM(c.role = 'gallery'), 0) AS gallery_count,
+               (
+                 SELECT thumb.thumb_rel_path FROM captures thumb
+                 WHERE thumb.item_id = i.id AND thumb.role = 'gallery'
+                 ORDER BY thumb.id LIMIT 1
+               ) AS thumb_rel_path
+        FROM items i LEFT JOIN captures c ON c.item_id = i.id
+        {where}
+        GROUP BY i.id ORDER BY i.id
+    """
+
+
 def list_items(settings: Settings) -> list[Item]:
     with db(settings) as connection:
-        rows = connection.execute(
-            """
-            SELECT i.id, i.name, i.price_cents, i.created_at,
-                   COALESCE(SUM(c.role = 'gallery'), 0) AS gallery_count,
-                   COALESCE(SUM(c.role = 'test'), 0) AS test_count
-            FROM items i LEFT JOIN captures c ON c.item_id = i.id
-            GROUP BY i.id ORDER BY i.id
-            """
-        ).fetchall()
+        rows = connection.execute(_item_query()).fetchall()
     return [Item(**dict(row)) for row in rows]
 
 
 def get_item(settings: Settings, item_id: int) -> Item | None:
     with db(settings) as connection:
         row = connection.execute(
-            """
-            SELECT i.id, i.name, i.price_cents, i.created_at,
-                   COALESCE(SUM(c.role = 'gallery'), 0) AS gallery_count,
-                   COALESCE(SUM(c.role = 'test'), 0) AS test_count
-            FROM items i LEFT JOIN captures c ON c.item_id = i.id
-            WHERE i.id = ? GROUP BY i.id
-            """,
-            (item_id,),
+            _item_query("WHERE i.id = ?"), (item_id,)
         ).fetchone()
     return Item(**dict(row)) if row else None
 

@@ -19,7 +19,7 @@ def _capture_out(capture) -> CaptureOut:
         id=capture.id, item_id=capture.item_id, role=capture.role,
         session_id=capture.session_id, rel_path=capture.rel_path,
         thumb_rel_path=capture.thumb_rel_path, mask_rel_path=capture.mask_rel_path,
-        width=capture.width, height=capture.height, hand_found=capture.hand_found,
+        width=capture.width, height=capture.height,
         mask_found=capture.mask_found, mask_status=capture.mask_status,
     )
 
@@ -43,8 +43,8 @@ async def upload_captures(
     session_id: str = "default",
     state=Depends(get_state),
 ):
-    if role not in ("gallery", "test"):
-        raise HTTPException(status_code=422, detail="role must be gallery or test")
+    if role != "gallery":
+        raise HTTPException(status_code=422, detail="Only gallery captures are supported")
     if get_item(state.settings, item_id) is None:
         raise HTTPException(status_code=404, detail="Item not found")
     if len(files) > 10:
@@ -62,8 +62,6 @@ async def upload_captures(
                     thumb_rel_path=result.capture.thumb_rel_path,
                     mask_rel_path=result.capture.mask_rel_path,
                     mask_status=result.capture.mask_status,
-                    near_duplicate=result.near_duplicate,
-                    near_duplicate_score=result.near_duplicate_score,
                 )
             )
         else:

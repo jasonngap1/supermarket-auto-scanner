@@ -12,7 +12,7 @@ class ItemOut(BaseModel):
     price_cents: int
     created_at: str
     gallery_count: int = 0
-    test_count: int = 0
+    thumb_rel_path: str | None = None
 
 
 class CaptureOut(BaseModel):
@@ -25,7 +25,6 @@ class CaptureOut(BaseModel):
     mask_rel_path: str
     width: int
     height: int
-    hand_found: bool
     mask_found: bool
     mask_status: str
 
@@ -35,8 +34,6 @@ class CaptureAccepted(BaseModel):
     thumb_rel_path: str
     mask_rel_path: str
     mask_status: str
-    near_duplicate: bool = False
-    near_duplicate_score: float | None = None
 
 
 class CaptureRejected(BaseModel):
@@ -53,25 +50,10 @@ class TopItemOut(BaseModel):
     name: str
     price_cents: int
     score: float
+    thumb_rel_path: str | None = None
 
 
-class VariantOut(BaseModel):
-    variant: str
+class ScanOut(BaseModel):
     status: str
     top_items: list[TopItemOut]
     timings_ms: dict[str, float]
-    error: str | None = None
-
-
-class AnalyzeOut(BaseModel):
-    frame_id: str
-    annotated_jpeg_b64: str
-    hand_found: bool
-    mask_found: bool
-    mask_status: str
-    variants: list[VariantOut]
-
-
-class EvaluationRequest(BaseModel):
-    variants: list[str]
-    item_ids: list[int] | None = None

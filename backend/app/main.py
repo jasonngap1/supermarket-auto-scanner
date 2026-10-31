@@ -4,16 +4,14 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from app import bootstrap  # noqa: F401  (must run before torch)
-from app.api import analyze as analyze_api
 from app.api import captures as captures_api
-from app.api import evaluations as evaluations_api
 from app.api import items as items_api
 from app.api import meta as meta_api
+from app.api import scan as scan_api
 from app.api.health import router as health_router
 from app.config import Settings, get_settings
 from app.db import init_db
 from app.dependencies import AppState, build_default_state
-from app.services.evaluation import recover_stale_runs
 
 
 def create_app(
@@ -27,7 +25,6 @@ def create_app(
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         init_db(settings)
-        recover_stale_runs(settings)
         if services.registry is not None and settings.warm_models:
             services.registry.warm()
         yield
@@ -40,8 +37,7 @@ def create_app(
         meta_api.router,
         items_api.router,
         captures_api.router,
-        analyze_api.router,
-        evaluations_api.router,
+        scan_api.router,
     ):
         app.include_router(router, prefix="/api")
     app.mount("/media", StaticFiles(directory=settings.media_dir), name="media")

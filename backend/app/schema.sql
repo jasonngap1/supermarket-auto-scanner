@@ -44,38 +44,3 @@ CREATE TABLE IF NOT EXISTS embeddings (
 );
 CREATE INDEX IF NOT EXISTS idx_embeddings_lookup
   ON embeddings(variant, model_key, preprocess_version);
-
-CREATE TABLE IF NOT EXISTS eval_runs (
-  id             TEXT PRIMARY KEY,
-  created_at     TEXT NOT NULL,
-  started_at     TEXT,
-  finished_at    TEXT,
-  status         TEXT NOT NULL CHECK (status IN ('queued','running','completed','failed')),
-  request_json   TEXT NOT NULL,
-  progress_done  INTEGER NOT NULL DEFAULT 0,
-  progress_total INTEGER NOT NULL DEFAULT 0,
-  metrics_json   TEXT,
-  error          TEXT
-);
-
-CREATE TABLE IF NOT EXISTS eval_samples (
-  id                 INTEGER PRIMARY KEY AUTOINCREMENT,
-  run_id             TEXT NOT NULL REFERENCES eval_runs(id) ON DELETE CASCADE,
-  capture_id         INTEGER,
-  variant            TEXT NOT NULL,
-  true_item_id       INTEGER,
-  true_item_name     TEXT NOT NULL,
-  true_price_cents   INTEGER NOT NULL,
-  pred_item_id       INTEGER,
-  pred_item_name     TEXT,
-  topk_json          TEXT NOT NULL,
-  correct_top1       INTEGER NOT NULL DEFAULT 0,
-  correct_top5       INTEGER NOT NULL DEFAULT 0,
-  sample_status      TEXT NOT NULL,
-  error              TEXT,
-  timings_json       TEXT NOT NULL,
-  rendered_rel_path  TEXT,
-  created_at         TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_eval_samples_run_variant
-  ON eval_samples(run_id, variant, correct_top1);

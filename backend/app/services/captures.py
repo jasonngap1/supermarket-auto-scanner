@@ -9,12 +9,10 @@ from app.config import Settings
 from app.db import db
 from app.domain import Capture, Role
 from app.errors import DuplicateCapture, ImageTooLarge, InvalidImage, ModelUnavailable
-from app.matching.vector_index import normalize
-from app.pipeline.types import HandObservation, Localization, MaskSelection, PromptSpec
+from app.pipeline.types import Localization
 from app.services.storage import (
     CaptureArtifacts,
     decode_image,
-    load_mask,
     resolve_media_path,
     save_capture_bundle,
     sha256_hex,
@@ -44,7 +42,6 @@ def add_capture(
     sha256: str,
     width: int,
     height: int,
-    hand_found: bool,
     mask_found: bool,
     mask_status: str,
     localization: dict,
@@ -62,7 +59,7 @@ def add_capture(
                 (
                     item_id, role, session_id, artifacts.rel_path,
                     artifacts.thumb_rel_path, artifacts.mask_rel_path, sha256,
-                    width, height, int(hand_found), int(mask_found), mask_status,
+                    width, height, 0, int(mask_found), mask_status,
                     json.dumps(localization), _now(),
                 ),
             )
@@ -105,42 +102,6 @@ def list_gallery_captures(settings: Settings):
             """
         ).fetchall()
     return [(_row_to_capture(row), row["name"], row["price_cents"]) for row in rows]
-
-
-@dataclass(frozen=True)
-class EvalCapture:
-    id: int
-    item_id: int
-    item_name: str
-    item_price_cents: int
-    rel_path: str
-    mask_rel_path: str
-    mask_found: bool
-    localization: dict
-
-
-def list_test_captures(settings: Settings, item_ids: list[int] | None = None) -> list[EvalCapture]:
-    query = """
-      SELECT c.*, i.name AS item_name, i.price_cents AS item_price_cents
-      FROM captures c JOIN items i ON i.id = c.item_id
-      WHERE c.role = 'test'
-    """
-    params: list = []
-    if item_ids:
-        query += " AND c.item_id IN (" + ",".join("?" for _ in item_ids) + ")"
-        params.extend(item_ids)
-    query += " ORDER BY c.id"
-    with db(settings) as connection:
-        rows = connection.execute(query, params).fetchall()
-    return [
-        EvalCapture(
-            id=row["id"], item_id=row["item_id"], item_name=row["item_name"],
-            item_price_cents=row["item_price_cents"], rel_path=row["rel_path"],
-            mask_rel_path=row["mask_rel_path"], mask_found=bool(row["mask_found"]),
-            localization=json.loads(row["localization_json"]),
-        )
-        for row in rows
-    ]
 
 
 def remove_capture_files(settings: Settings, capture: Capture) -> None:
@@ -212,17 +173,11 @@ def get_embedding(
 def localization_to_dict(localization: Localization) -> dict:
     selected = localization.selection.selected
     return {
-        "hand": None if localization.hand is None else {
-            "landmarks_px": localization.hand.landmarks_px,
-            "bbox": localization.hand.bbox,
-            "score": localization.hand.score,
-        },
         "prompt": None if localization.prompt is None else {
             "positive_points": localization.prompt.positive_points,
             "negative_points": localization.prompt.negative_points,
             "box": localization.prompt.box,
             "mode": localization.prompt.mode,
-            "text": localization.prompt.text,
         },
         "selection": {
             "selected_index": None if selected is None else selected.index,
@@ -230,40 +185,13 @@ def localization_to_dict(localization: Localization) -> dict:
             "scores": localization.selection.scores,
             "area_ratios": localization.selection.area_ratios,
         },
+        "face": None if localization.face is None else {
+            "bbox": localization.face.bbox,
+            "score": localization.face.score,
+        },
         "status": localization.status,
         "timings_ms": localization.timings_ms,
     }
-
-
-def load_capture_localization(settings: Settings, capture) -> Localization:
-    data = capture.localization
-    hand_data = data.get("hand")
-    hand = None
-    if hand_data:
-        hand = HandObservation(
-            landmarks_px=[tuple(point) for point in hand_data["landmarks_px"]],
-            bbox=tuple(hand_data["bbox"]),
-            score=float(hand_data["score"]),
-        )
-    prompt_data = data.get("prompt")
-    prompt = None
-    if prompt_data:
-        prompt = PromptSpec(
-            positive_points=[tuple(p) for p in prompt_data["positive_points"]],
-            negative_points=[tuple(p) for p in prompt_data["negative_points"]],
-            box=None if prompt_data["box"] is None else tuple(prompt_data["box"]),
-            mode=prompt_data["mode"],
-            text=prompt_data.get("text"),
-        )
-    mask = load_mask(settings, capture.mask_rel_path) if capture.mask_found else None
-    return Localization(
-        hand=hand,
-        prompt=prompt,
-        selection=MaskSelection(None, data.get("selection", {}).get("reasons", []), [], []),
-        mask=mask,
-        status=data.get("status", "ok"),
-        timings_ms=data.get("timings_ms", {}),
-    )
 
 
 def capture_duplicate_exists(settings: Settings, item_id: int, role: str, sha256: str) -> bool:
@@ -280,41 +208,12 @@ class CaptureUploadResult:
     accepted: bool
     capture: Capture | None = None
     reason: str | None = None
-    near_duplicate: bool = False
-    near_duplicate_score: float | None = None
-
-
-NEAR_DUPLICATE_THRESHOLD = 0.995
 
 
 class CaptureService:
-    def __init__(self, settings, pipeline, embeddings=None):
+    def __init__(self, settings, pipeline):
         self.settings = settings
         self.pipeline = pipeline
-        self.embeddings = embeddings
-
-    def _near_duplicate_score(self, capture: Capture, role: str) -> float | None:
-        """Compare this capture against the opposite role for the same item.
-
-        A test image that nearly duplicates a gallery image (or vice versa)
-        inflates evaluation scores; surface it at enrollment time.
-        """
-        if self.embeddings is None:
-            return None
-        try:
-            vector = self.embeddings.get_capture_vector(capture, "v2")
-            if vector is None:
-                return None
-            query = normalize(vector)
-            other_role = "test" if role == "gallery" else "gallery"
-            best = 0.0
-            for other in list_captures(self.settings, capture.item_id, other_role):
-                other_vector = self.embeddings.get_capture_vector(other, "v2")
-                if other_vector is not None:
-                    best = max(best, float(query @ normalize(other_vector)))
-            return best
-        except Exception:
-            return None
 
     def add(self, item_id: int, role: str, session_id: str, data: bytes) -> CaptureUploadResult:
         try:
@@ -338,26 +237,19 @@ class CaptureService:
             capture = add_capture(
                 self.settings,
                 item_id=item_id,
-                role=role,
+                role=role,  # type: ignore[arg-type]
                 session_id=session_id,
                 artifacts=artifacts,
                 sha256=digest,
                 width=width,
                 height=height,
-                hand_found=localization.hand is not None,
                 mask_found=localization.mask is not None,
                 mask_status=localization.status,
                 localization=localization_to_dict(localization),
             )
         except DuplicateCapture:
             return CaptureUploadResult(False, reason="duplicate")
-        score = self._near_duplicate_score(capture, role)
-        return CaptureUploadResult(
-            True,
-            capture=capture,
-            near_duplicate=score is not None and score > NEAR_DUPLICATE_THRESHOLD,
-            near_duplicate_score=score,
-        )
+        return CaptureUploadResult(True, capture=capture)
 
     def list(self, item_id: int, role: str | None = None):
         return list_captures(self.settings, item_id, role)  # type: ignore[arg-type]

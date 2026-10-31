@@ -21,7 +21,7 @@ function itemButton(item) {
   button.textContent = `${item.name} — ${formatPrice(
     item.price_cents,
     meta.currency_symbol,
-  )} (gallery ${item.gallery_count} / test ${item.test_count})`;
+  )} (gallery ${item.gallery_count})`;
   button.addEventListener("click", () => selectItem(item));
   return button;
 }
@@ -59,21 +59,18 @@ async function selectItem(item) {
 
 async function refreshCaptures() {
   if (!selectedItem) return;
-  const [gallery, test] = await Promise.all([
-    getCaptures(selectedItem.id, "gallery"),
-    getCaptures(selectedItem.id, "test"),
-  ]);
+  const gallery = await getCaptures(selectedItem.id);
   document.getElementById("capture-counts").textContent =
-    `Gallery: ${gallery.length} · Test: ${test.length}`;
+    `Gallery: ${gallery.length}`;
   const grid = document.getElementById("capture-grid");
   grid.replaceChildren();
-  for (const capture of [...gallery, ...test]) {
+  for (const capture of gallery) {
     const figure = document.createElement("figure");
     const image = document.createElement("img");
     image.src = `/media/${capture.thumb_rel_path}`;
-    image.alt = `${capture.role} capture`;
+    image.alt = "Gallery capture";
     const caption = document.createElement("figcaption");
-    caption.textContent = `${capture.role} · ${capture.mask_status}`;
+    caption.textContent = capture.mask_status;
     const remove = document.createElement("button");
     remove.type = "button";
     remove.textContent = "Delete";
@@ -87,33 +84,25 @@ async function refreshCaptures() {
   }
 }
 
-async function capture(role, button) {
+async function capture(button) {
   if (!selectedItem) return;
   button.disabled = true;
   const status = document.getElementById("enroll-status");
-  status.textContent = "Capturing and segmenting…";
+  status.textContent = "Capturing…";
   try {
     const blob = await captureFrame(document.getElementById("enroll-video"));
     const result = await uploadCaptures(
       selectedItem.id,
-      role,
       document.getElementById("enroll-session").value || sessionId,
       [blob],
     );
     if (result.accepted.length) {
-      const accepted = result.accepted[0];
-      status.textContent = `Accepted ${role} capture.`;
-      if (accepted.near_duplicate) {
-        status.textContent +=
-          ` ⚠ Near-duplicate of an existing ${role === "test" ? "gallery" : "test"} image` +
-          ` (${accepted.near_duplicate_score.toFixed(3)}); use a different angle/session.`;
-      }
+      status.textContent = "Gallery photo added.";
     } else {
       const reason = result.rejected[0]?.reason || "unknown";
       const message =
         {
           mask_rejected: "item not found — hold it in the centre of the frame",
-          no_hand: "no hand detected — hold the item up to the camera",
           duplicate: "duplicate image",
           model_error: "model unavailable",
         }[reason] || reason;
@@ -145,13 +134,13 @@ export function initEnroll(metaData) {
     document.getElementById("enroll-session").value = sessionId;
   });
 
-  document.querySelectorAll("#enroll-panel [data-role]").forEach((button) => {
-    button.addEventListener("click", () => capture(button.dataset.role, button));
+  document.getElementById("enroll-capture").addEventListener("click", (event) => {
+    capture(event.currentTarget);
   });
 
   document.getElementById("enroll-delete-item").addEventListener("click", async () => {
     if (!selectedItem) return;
-    if (!confirm(`Delete ${selectedItem.name} and all its captures?`)) return;
+    if (!confirm(`Delete ${selectedItem.name} and all its gallery photos?`)) return;
     await deleteItem(selectedItem.id);
     clearSelection();
     await refreshItems();

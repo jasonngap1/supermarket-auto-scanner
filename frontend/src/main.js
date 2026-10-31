@@ -1,12 +1,10 @@
 import { getMeta } from "./api.js";
 import { initScan, activateScan, deactivateScan } from "./tabs/scan.js";
 import { initEnroll, activateEnroll, deactivateEnroll } from "./tabs/enroll.js";
-import { initEvaluate, activateEvaluate } from "./tabs/evaluate.js";
 
 const tabs = {
   scan: { activate: activateScan, deactivate: deactivateScan },
   enroll: { activate: activateEnroll, deactivate: deactivateEnroll },
-  evaluate: { activate: activateEvaluate, deactivate: () => {} },
 };
 let activeTab = "scan";
 
@@ -32,7 +30,6 @@ async function boot() {
   const meta = await getMeta();
   initScan(meta);
   initEnroll(meta);
-  initEvaluate(meta);
   await activateScan();
 }
 

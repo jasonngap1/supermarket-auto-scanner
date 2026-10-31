@@ -12,6 +12,7 @@ class GalleryEntry:
     name: str
     price_cents: int
     vectors: np.ndarray
+    thumb_rel_path: str | None = None
 
 
 def item_topk(query: np.ndarray, entries: list[GalleryEntry], k: int = 3) -> list[TopItem]:
@@ -32,6 +33,7 @@ def item_topk(query: np.ndarray, entries: list[GalleryEntry], k: int = 3) -> lis
                 name=entry.name,
                 price_cents=entry.price_cents,
                 score=float(np.max(scores)),
+                thumb_rel_path=entry.thumb_rel_path,
             )
         )
     scored.sort(key=lambda item: item.score, reverse=True)
