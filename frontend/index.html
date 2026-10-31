@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Supermarket Auto-Scanner Lab</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Supermarket Auto-Scanner Lab</h1>
+      <nav>
+        <button data-tab="scan" class="active">Scan</button>
+        <button data-tab="enroll">Enroll</button>
+        <button data-tab="evaluate">Evaluate</button>
+      </nav>
+    </header>
+
+    <main>
+      <section id="tab-scan" class="tab active">
+        <div class="grid two">
+          <div>
+            <video id="scan-video" autoplay playsinline muted></video>
+            <div class="row">
+              <button id="scan-analyze">Analyze now</button>
+              <label><input id="scan-auto" type="checkbox" /> Auto (~1 fps)</label>
+            </div>
+            <div id="scan-variants" class="chips"></div>
+            <div id="scan-status" class="status"></div>
+          </div>
+          <div>
+            <img id="scan-annotated" alt="Annotated frame" />
+            <div id="scan-results"></div>
+            <pre id="scan-timings"></pre>
+          </div>
+        </div>
+      </section>
+
+      <section id="tab-enroll" class="tab">
+        <form id="item-form" class="row">
+          <input id="item-name" placeholder="Item name" required maxlength="120" />
+          <input id="item-price" type="number" min="0" step="0.01" placeholder="Price" required />
+          <button type="submit">Add item</button>
+        </form>
+        <div id="item-list" class="list"></div>
+        <div id="enroll-panel" hidden>
+          <h2 id="selected-item-name"></h2>
+          <div class="grid two">
+            <div>
+              <video id="enroll-video" autoplay playsinline muted></video>
+              <div class="row">
+                <label>Session <input id="enroll-session" size="10" /></label>
+                <button id="enroll-new-session" type="button">New session</button>
+              </div>
+              <div class="row">
+                <button type="button" data-role="gallery">Capture gallery</button>
+                <button type="button" data-role="test">Capture test</button>
+                <button id="enroll-delete-item" type="button" class="danger">Delete item</button>
+              </div>
+              <div id="enroll-status" class="status"></div>
+            </div>
+            <div>
+              <div id="capture-counts" class="muted"></div>
+              <div id="capture-grid" class="capture-grid"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="tab-evaluate" class="tab">
+        <div class="row">
+          <button id="eval-run">Run evaluation</button>
+          <span class="muted">Batch only — scores held-out test captures.</span>
+        </div>
+        <div id="eval-variants" class="chips"></div>
+        <div id="evaluate-status" class="status"></div>
+        <div id="eval-results"></div>
+        <div id="eval-failures"></div>
+      </section>
+    </main>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
