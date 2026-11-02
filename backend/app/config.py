@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     )
 
     data_dir: Path = PROJECT_ROOT / "data"
+    catalog_dir: Path | None = None  # defaults to a sibling of data_dir
     device: str = "auto"  # auto | mps | cpu
     currency_symbol: str = "$"
     warm_models: bool = True

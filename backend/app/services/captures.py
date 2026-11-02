@@ -10,6 +10,7 @@ from app.db import db
 from app.domain import Capture, Role
 from app.errors import DuplicateCapture, ImageTooLarge, InvalidImage, ModelUnavailable
 from app.pipeline.types import Localization
+from app.services.catalog import sync_catalog
 from app.services.storage import (
     CaptureArtifacts,
     decode_image,
@@ -249,10 +250,14 @@ class CaptureService:
             )
         except DuplicateCapture:
             return CaptureUploadResult(False, reason="duplicate")
+        sync_catalog(self.settings)
         return CaptureUploadResult(True, capture=capture)
 
     def list(self, item_id: int, role: str | None = None):
         return list_captures(self.settings, item_id, role)  # type: ignore[arg-type]
 
     def delete(self, item_id: int, capture_id: int) -> bool:
-        return delete_capture(self.settings, item_id, capture_id)
+        deleted = delete_capture(self.settings, item_id, capture_id)
+        if deleted:
+            sync_catalog(self.settings)
+        return deleted

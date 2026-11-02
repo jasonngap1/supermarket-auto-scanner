@@ -1,0 +1,110 @@
+{
+  "version": 1,
+  "items": [
+    {
+      "id": 2,
+      "name": "bottle",
+      "price_cents": 500,
+      "created_at": "2026-10-31T02:30:56+00:00"
+    },
+    {
+      "id": 3,
+      "name": "cotton bud",
+      "price_cents": 200,
+      "created_at": "2026-10-31T02:57:07+00:00"
+    },
+    {
+      "id": 4,
+      "name": "black gold pomade",
+      "price_cents": 1000,
+      "created_at": "2026-10-31T02:59:32+00:00"
+    }
+  ],
+  "captures": [
+    {
+      "id": 2,
+      "item_id": 2,
+      "role": "gallery",
+      "session_id": "e6c10c72",
+      "rel_path": "images/2/01fdffd4e623449082ccbbbe418ec619.jpg",
+      "thumb_rel_path": "thumbs/01fdffd4e623449082ccbbbe418ec619.jpg",
+      "mask_rel_path": "masks/01fdffd4e623449082ccbbbe418ec619.png",
+      "sha256": "234f08bd3ae20477f8ee9c0b348ad041816d5f5e2ece6c9e74422dc133705911",
+      "width": 1280,
+      "height": 720,
+      "hand_found": 0,
+      "mask_found": 1,
+      "mask_status": "ok",
+      "localization_json": "{}",
+      "created_at": "2026-10-31T02:31:14+00:00"
+    },
+    {
+      "id": 3,
+      "item_id": 3,
+      "role": "gallery",
+      "session_id": "4ed5dba5",
+      "rel_path": "images/3/e81d833b3b974da8872076293d3b7a07.jpg",
+      "thumb_rel_path": "thumbs/e81d833b3b974da8872076293d3b7a07.jpg",
+      "mask_rel_path": "masks/e81d833b3b974da8872076293d3b7a07.png",
+      "sha256": "cbbf8bae0a5d3302d4e5afef92955cd93632501c43b9aa1be94fa584568de928",
+      "width": 1280,
+      "height": 720,
+      "hand_found": 0,
+      "mask_found": 1,
+      "mask_status": "ok",
+      "localization_json": "{}",
+      "created_at": "2026-10-31T02:57:40+00:00"
+    },
+    {
+      "id": 4,
+      "item_id": 3,
+      "role": "gallery",
+      "session_id": "4ed5dba5",
+      "rel_path": "images/3/7bbb32a14e7245d1a499a1f83842746f.jpg",
+      "thumb_rel_path": "thumbs/7bbb32a14e7245d1a499a1f83842746f.jpg",
+      "mask_rel_path": "masks/7bbb32a14e7245d1a499a1f83842746f.png",
+      "sha256": "0567695628573cac0df3fcb03455b281d8e230fe1e3e51da364334ab9b207ea0",
+      "width": 1280,
+      "height": 720,
+      "hand_found": 0,
+      "mask_found": 1,
+      "mask_status": "ok",
+      "localization_json": "{}",
+      "created_at": "2026-10-31T02:59:14+00:00"
+    },
+    {
+      "id": 5,
+      "item_id": 4,
+      "role": "gallery",
+      "session_id": "4ed5dba5",
+      "rel_path": "images/4/f1815f9277854c9aa9292d3344419d11.jpg",
+      "thumb_rel_path": "thumbs/f1815f9277854c9aa9292d3344419d11.jpg",
+      "mask_rel_path": "masks/f1815f9277854c9aa9292d3344419d11.png",
+      "sha256": "c453ba45a8e2fe4db94d7fcfbd6daa4859c49d54f3565ac1f6fbf12edd5ebcd1",
+      "width": 1280,
+      "height": 720,
+      "hand_found": 0,
+      "mask_found": 1,
+      "mask_status": "ok",
+      "localization_json": "{}",
+      "created_at": "2026-10-31T02:59:40+00:00"
+    },
+    {
+      "id": 6,
+      "item_id": 4,
+      "role": "gallery",
+      "session_id": "4ed5dba5",
+      "rel_path": "images/4/b25b8cf079314c259405f2d2c3ba5a69.jpg",
+      "thumb_rel_path": "thumbs/b25b8cf079314c259405f2d2c3ba5a69.jpg",
+      "mask_rel_path": "masks/b25b8cf079314c259405f2d2c3ba5a69.png",
+      "sha256": "ea7aae8abc935eed07e43fe2e10dca213714dc42420d796f7369724d03e14367",
+      "width": 1280,
+      "height": 720,
+      "hand_found": 0,
+      "mask_found": 1,
+      "mask_status": "ok",
+      "localization_json": "{}",
+      "created_at": "2026-10-31T02:59:46+00:00"
+    }
+  ]
+}

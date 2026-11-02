@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from app.config import Settings
 from app.db import db
 from app.domain import Item
+from app.services.catalog import sync_catalog
 
 
 def _now() -> str:
@@ -21,6 +22,7 @@ def create_item(settings: Settings, name: str, price_cents: int) -> Item:
         item_id = int(cursor.lastrowid)
     item = get_item(settings, item_id)
     assert item is not None
+    sync_catalog(settings)
     return item
 
 
@@ -62,4 +64,5 @@ def delete_item(settings: Settings, item_id: int) -> bool:
     if cursor.rowcount > 0:
         for capture in captures:
             remove_capture_files(settings, capture)
+        sync_catalog(settings)
     return cursor.rowcount > 0

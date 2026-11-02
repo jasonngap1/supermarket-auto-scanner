@@ -12,6 +12,7 @@ from app.api.health import router as health_router
 from app.config import Settings, get_settings
 from app.db import init_db
 from app.dependencies import AppState, build_default_state
+from app.services.catalog import seed_catalog
 
 
 def create_app(
@@ -24,7 +25,10 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        fresh_database = not settings.db_path.exists()
         init_db(settings)
+        if fresh_database:
+            seed_catalog(settings)
         if services.registry is not None and settings.warm_models:
             services.registry.warm()
         yield

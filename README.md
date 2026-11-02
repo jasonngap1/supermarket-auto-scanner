@@ -74,6 +74,26 @@ SQLite at `data/app.db`; media under `data/media`. Gallery captures, masks, and
 segmented thumbnails are stored per item. Enrollment rejects duplicate images
 and frames where the centre localizer finds no item mask.
 
+### Shared enrolled catalog
+
+`catalog/` is committed to the repo. It holds `catalog.json` plus every gallery
+image, mask, and thumbnail needed to recreate the enrolled item list. A fresh
+clone with no `data/app.db` imports this catalog on first startup, so another
+user sees the same Items list and can scan the same products.
+
+The running app refreshes `catalog/` after every item or gallery-capture change.
+Commit those changes to share newly enrolled items. To rebuild the snapshot
+manually:
+
+```bash
+cd backend
+uv run python ../scripts/export_catalog.py
+```
+
+`catalog/` takes priority only when the local database does not exist. An
+existing local database is never overwritten; delete it only if you intend to
+replace local items with the repository snapshot.
+
 Existing databases from the earlier validation lab keep their old tables and
 V1/V2/V3 embeddings; the scanner ignores them.
 
