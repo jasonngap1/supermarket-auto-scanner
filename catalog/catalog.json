@@ -18,6 +18,18 @@
       "name": "black gold pomade",
       "price_cents": 1000,
       "created_at": "2026-10-31T02:59:32+00:00"
+    },
+    {
+      "id": 5,
+      "name": "brown umbrella",
+      "price_cents": 1000,
+      "created_at": "2026-11-02T11:34:12+00:00"
+    },
+    {
+      "id": 6,
+      "name": "mineral bottle",
+      "price_cents": 500,
+      "created_at": "2026-11-04T07:12:42+00:00"
     }
   ],
   "captures": [
@@ -105,6 +117,23 @@
       "mask_status": "ok",
       "localization_json": "{}",
       "created_at": "2026-10-31T02:59:46+00:00"
+    },
+    {
+      "id": 8,
+      "item_id": 6,
+      "role": "gallery",
+      "session_id": "f34aa2e1",
+      "rel_path": "images/6/daa937a452e949c6a826807c79cc9470.jpg",
+      "thumb_rel_path": "thumbs/daa937a452e949c6a826807c79cc9470.jpg",
+      "mask_rel_path": "masks/daa937a452e949c6a826807c79cc9470.png",
+      "sha256": "7b694624852d061b2a2819d0dbdb2f197c908a8afa134f2d6d85f58c8f97416c",
+      "width": 1280,
+      "height": 720,
+      "hand_found": 0,
+      "mask_found": 1,
+      "mask_status": "ok",
+      "localization_json": "{}",
+      "created_at": "2026-11-04T07:13:59+00:00"
     }
   ]
 }

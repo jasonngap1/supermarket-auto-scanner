@@ -32,9 +32,9 @@ class ScanService:
                 timings_ms={},
             )
 
-        vector, timings = self.pipeline.embed_frame(image)
+        vectors, timings = self.pipeline.embed_frame_variants(image)
         match_start = time.perf_counter()
-        top_items = item_topk(vector, entries, k=3)
+        top_items = item_topk(vectors, entries, k=3)
         timings["match"] = (time.perf_counter() - match_start) * 1000
         timings["total"] = timings.get("total", 0.0) + timings["match"]
 

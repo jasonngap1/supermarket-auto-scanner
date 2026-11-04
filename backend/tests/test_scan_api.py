@@ -15,10 +15,11 @@ class FakePipeline:
     def __init__(self, error=False):
         self.error = error
 
-    def embed_frame(self, image):
+    def embed_frame_variants(self, image):
         if self.error:
             raise ModelUnavailable("model unavailable")
-        return np.array([1, 0, 0, 0], dtype=np.float32), {"total": 1.0}
+        vector = np.array([1, 0, 0, 0], dtype=np.float32)
+        return {"v0": vector, "center": vector}, {"total": 1.0}
 
 
 class FakeEmbeddings:
@@ -30,11 +31,13 @@ class FakeEmbeddings:
             return []
         return [
             GalleryEntry(
-                1, "Milk 1L", 199, np.array([[1, 0, 0, 0]], dtype=np.float32),
+                1, "Milk 1L", 199,
+                {"v0": np.array([[1, 0, 0, 0]], dtype=np.float32)},
                 "thumbs/milk.jpg",
             ),
             GalleryEntry(
-                2, "Bread", 250, np.array([[0, 1, 0, 0]], dtype=np.float32),
+                2, "Bread", 250,
+                {"v0": np.array([[0, 1, 0, 0]], dtype=np.float32)},
                 "thumbs/bread.jpg",
             ),
         ]

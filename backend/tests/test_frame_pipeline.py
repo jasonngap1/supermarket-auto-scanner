@@ -9,8 +9,20 @@ def test_v0_embedding_never_runs_segmentation(tmp_path):
     vector, timings = pipeline.embed_frame(image())
     assert vector.shape == (8,)
     assert segmenter.calls == 0
-    assert timings["preprocess"] >= 0
-    assert timings["embed"] >= 0
+    assert timings["preprocess_v0"] >= 0
+    assert timings["embed_v0"] >= 0
+
+
+def test_embedding_variants_include_whole_frame_and_center_crop(tmp_path):
+    segmenter = FakeSam2()
+    pipeline = FramePipeline(FakeRegistry(segmenter=segmenter), make_settings(tmp_path))
+    vectors, timings = pipeline.embed_frame_variants(image())
+    assert set(vectors) == {"v0", "center"}
+    assert all(vector.shape == (8,) for vector in vectors.values())
+    assert segmenter.calls == 0
+    assert set(timings) == {
+        "preprocess_v0", "embed_v0", "preprocess_center", "embed_center", "total"
+    }
 
 
 def test_sam2_center_uses_centre_point_without_a_hand(tmp_path):

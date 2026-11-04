@@ -12,6 +12,10 @@ const milk = { item_id: 1, name: "Milk", price_cents: 199, score: 0.9 };
 const bread = { item_id: 2, name: "Bread", price_cents: 250, score: 0.9 };
 
 describe("scan gate", () => {
+  it("uses 0.70 as the add threshold", () => {
+    expect(ADD_SCORE).toBe(0.7);
+  });
+
   it("adds an item at the add threshold and locks", () => {
     const result = observeScan(createScanState(), milk);
     expect(result.added).toEqual(milk);
@@ -20,7 +24,10 @@ describe("scan gate", () => {
   });
 
   it("does not add anything below the add threshold", () => {
-    const result = observeScan(createScanState(), { ...milk, score: 0.79 });
+    const result = observeScan(createScanState(), {
+      ...milk,
+      score: ADD_SCORE - 0.01,
+    });
     expect(result.added).toBeNull();
     expect(result.state.lockedItemId).toBeNull();
   });

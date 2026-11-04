@@ -1,8 +1,13 @@
 import numpy as np
 
 from app.matching.matcher import GalleryEntry
-from app.pipeline.frame_pipeline import EMBED_MODEL_KEY, EMBED_VARIANT
-from app.pipeline.preprocess import PREPROCESS_VERSION, letterbox
+from app.pipeline.frame_pipeline import EMBED_MODEL_KEY
+from app.pipeline.preprocess import (
+    EMBED_VARIANTS,
+    EMBED_VARIANT,
+    preprocess_for_variant,
+    preprocess_version_for_variant,
+)
 from app.services.captures import get_embedding, list_gallery_captures, upsert_embedding
 from app.services.storage import load_image_rgb
 
@@ -12,26 +17,29 @@ class EmbeddingService:
         self.settings = settings
         self.registry = registry
 
-    def get_capture_vector(self, capture) -> np.ndarray | None:
+    def get_capture_vector(
+        self, capture, variant: str = EMBED_VARIANT
+    ) -> np.ndarray | None:
+        version = preprocess_version_for_variant(variant)
         cached = get_embedding(
             self.settings,
             capture.id,
-            EMBED_VARIANT,
+            variant,
             EMBED_MODEL_KEY,
-            PREPROCESS_VERSION,
+            version,
         )
         if cached is not None:
             return cached
 
         image = load_image_rgb(self.settings, capture.rel_path)
-        crop = letterbox(image, self.settings.input_size)
+        crop = preprocess_for_variant(image, variant, self.settings.input_size)
         vector = self.registry.embed(crop)
         upsert_embedding(
             self.settings,
             capture.id,
-            EMBED_VARIANT,
+            variant,
             EMBED_MODEL_KEY,
-            PREPROCESS_VERSION,
+            version,
             vector,
         )
         return vector
@@ -39,25 +47,29 @@ class EmbeddingService:
     def gallery_entries(self) -> list[GalleryEntry]:
         grouped: dict[int, dict] = {}
         for capture, name, price_cents in list_gallery_captures(self.settings):
-            vector = self.get_capture_vector(capture)
-            if vector is None:
-                continue
             bucket = grouped.setdefault(
                 capture.item_id,
                 {
                     "name": name,
                     "price": price_cents,
-                    "vectors": [],
+                    "vectors": {variant: [] for variant in EMBED_VARIANTS},
                     "thumb": capture.thumb_rel_path,
                 },
             )
-            bucket["vectors"].append(vector)
+            for variant in EMBED_VARIANTS:
+                vector = self.get_capture_vector(capture, variant)
+                if vector is not None:
+                    bucket["vectors"][variant].append(vector)
         return [
             GalleryEntry(
                 item_id,
                 data["name"],
                 data["price"],
-                np.vstack(data["vectors"]),
+                {
+                    variant: np.vstack(vectors)
+                    for variant, vectors in data["vectors"].items()
+                    if vectors
+                },
                 data["thumb"],
             )
             for item_id, data in grouped.items()

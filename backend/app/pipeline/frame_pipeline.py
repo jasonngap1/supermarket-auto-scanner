@@ -5,11 +5,14 @@ import numpy as np
 from app.config import Settings
 from app.errors import ModelUnavailable
 from app.pipeline.mask_select import select_center_mask
-from app.pipeline.preprocess import letterbox
+from app.pipeline.preprocess import (
+    EMBED_VARIANTS,
+    EMBED_VARIANT,
+    preprocess_for_variant,
+)
 from app.pipeline.prompts import build_center_prompt
-from app.pipeline.types import Localization, MaskSelection
+from app.pipeline.types import Localization
 
-EMBED_VARIANT = "v0"
 EMBED_MODEL_KEY = "dinov2-small"
 
 
@@ -79,14 +82,32 @@ class FramePipeline:
         )
 
     def embed_frame(self, image_rgb: np.ndarray) -> tuple[np.ndarray, dict[str, float]]:
-        """Whole-frame DINOv2 embedding; this is the only recognition path."""
+        """Whole-frame DINOv2 embedding."""
         timings: dict[str, float] = {}
         with self.registry.gate():
-            start = time.perf_counter()
-            crop = letterbox(image_rgb, self.settings.input_size)
-            timings["preprocess"] = (time.perf_counter() - start) * 1000
-            start = time.perf_counter()
-            vector = self.registry.embed(crop)
-            timings["embed"] = (time.perf_counter() - start) * 1000
+            vector = self._embed_variant(image_rgb, EMBED_VARIANT, timings)
         timings["total"] = sum(timings.values())
         return vector, timings
+
+    def embed_frame_variants(
+        self, image_rgb: np.ndarray
+    ) -> tuple[dict[str, np.ndarray], dict[str, float]]:
+        """Whole-frame and centred-crop embeddings for background-robust matching."""
+        timings: dict[str, float] = {}
+        vectors: dict[str, np.ndarray] = {}
+        with self.registry.gate():
+            for variant in EMBED_VARIANTS:
+                vectors[variant] = self._embed_variant(image_rgb, variant, timings)
+        timings["total"] = sum(timings.values())
+        return vectors, timings
+
+    def _embed_variant(
+        self, image_rgb: np.ndarray, variant: str, timings: dict[str, float]
+    ) -> np.ndarray:
+        start = time.perf_counter()
+        crop = preprocess_for_variant(image_rgb, variant, self.settings.input_size)
+        timings[f"preprocess_{variant}"] = (time.perf_counter() - start) * 1000
+        start = time.perf_counter()
+        vector = self.registry.embed(crop)
+        timings[f"embed_{variant}"] = (time.perf_counter() - start) * 1000
+        return vector

@@ -3,9 +3,11 @@
 Local scanner app: hold an item in front of the camera, the app recognizes it,
 and adds it to a running cart with quantity, prices, and an order total.
 
-Recognition uses the whole camera frame with a DINOv2 embedding and exact
-cosine matching. SAM2 and face detection are used only when enrolling an item,
-to create a segmented gallery thumbnail for the cart.
+Recognition compares the whole camera frame and a centred item crop against the
+enrolled gallery. Matching takes the best score across both views, so a changed
+background is less likely to hide the item. SAM2 and face detection are used
+only when enrolling an item, to create a segmented gallery thumbnail for the
+cart.
 
 ## Requirements
 
@@ -56,12 +58,12 @@ and device status.
 
 ### Duplicate guard
 
-A match is added at cosine similarity **0.80** or above. The scanner then locks
+A match is added at cosine similarity **0.70** or above. The scanner then locks
 that item so holding it in view does not add it repeatedly.
 
 The lock is released when the match drops below **0.60** (or no match is found)
 for **3 consecutive scan frames**. It can also switch directly when a different
-item scores at least 0.80 for 3 consecutive frames.
+item scores at least 0.70 for 3 consecutive frames.
 
 Consequence: to scan the next unit of the *same* item, remove the current item
 from view for about 3 frames (~3.3 seconds), then show the next unit. Two
@@ -112,8 +114,8 @@ cd backend && RUN_MODEL_TESTS=1 uv run pytest -m slow -q
 
 ## Notes
 
-- Whole-frame matching can use background context. Keep the scanner location
-  and lighting reasonably stable for the best results.
+- Matching also uses a fixed centre crop of the held item, which reduces the
+  effect of a changed background. Keep the item centred in the frame.
 - The frontend shows no model names, scores, or timings.
 - DINOv2 weight licensing must be verified before commercial use.
 - Local-only: backend binds to `127.0.0.1`; data never leaves the machine.
