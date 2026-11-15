@@ -84,12 +84,12 @@ The gallery vector is computed on first scan from the stored mask.
 
 ### Duplicate guard
 
-A match is added at cosine similarity **0.70** or above. The scanner then locks
+A match is added at cosine similarity **0.60** or above. The scanner then locks
 that item so holding it in view does not add it repeatedly.
 
 The lock is released when the match drops below **0.60** (or no match is found)
 for **3 consecutive scan frames**. It can also switch directly when a different
-item scores at least 0.70 for 3 consecutive frames.
+item scores at least 0.60 for 3 consecutive frames.
 
 Consequence: to scan the next unit of the *same* item, remove the current item
 from view for about 3 frames (~3.3 seconds), then show the next unit. Two
