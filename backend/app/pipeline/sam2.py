@@ -5,12 +5,12 @@ from app.pipeline.types import MaskCandidate, PromptSpec
 
 
 def prompt_payload(prompt: PromptSpec) -> dict:
-    points = [*prompt.positive_points, *prompt.negative_points]
-    labels = [1] * len(prompt.positive_points) + [0] * len(prompt.negative_points)
-    payload = {
-        "input_points": [[[list(map(float, point)) for point in points]]],
-        "input_labels": [[labels]],
-    }
+    payload = {}
+    if prompt.positive_points:
+        payload["input_points"] = [
+            [[list(map(float, point)) for point in prompt.positive_points]]
+        ]
+        payload["input_labels"] = [[[1] * len(prompt.positive_points)]]
     if prompt.box is not None:
         payload["input_boxes"] = [[list(map(float, prompt.box))]]
     return payload

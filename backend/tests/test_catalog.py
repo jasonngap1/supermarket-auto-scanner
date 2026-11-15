@@ -27,7 +27,6 @@ def make_capture(settings, item):
         height=32,
         mask_found=True,
         mask_status="ok",
-        localization={"status": "ok", "selection": {}},
     )
 
 
@@ -60,6 +59,40 @@ def test_export_then_seed_fresh_database(tmp_path):
         assert [entry["id"] for entry in captures] == [capture.id]
         assert client.get(f"/media/{capture.thumb_rel_path}").status_code == 200
         assert client.get(f"/media/{capture.rel_path}").status_code == 200
+
+
+def test_catalog_handles_a_capture_without_a_mask(tmp_path):
+    catalog = tmp_path / "catalog"
+    source = Settings(data_dir=tmp_path / "source", catalog_dir=catalog)
+    init_db(source)
+    item = create_item(source, "Milk 1L", 199)
+    image = np.full((32, 32, 3), 128, dtype=np.uint8)
+    artifacts = save_capture_bundle(source, item.id, image)
+    capture = add_capture(
+        source,
+        item_id=item.id,
+        role="gallery",
+        session_id="s1",
+        artifacts=artifacts,
+        sha256="b" * 64,
+        width=32,
+        height=32,
+        mask_status="no_detection",
+    )
+    export_catalog(source)
+
+    payload = json.loads(manifest_path(source).read_text())
+    assert payload["captures"][0]["mask_rel_path"] == ""
+
+    clone = Settings(
+        data_dir=tmp_path / "clone", catalog_dir=catalog, warm_models=False
+    )
+    with TestClient(create_app(clone)) as client:
+        captures = client.get(
+            f"/api/items/{item.id}/captures?role=gallery"
+        ).json()
+        assert [entry["id"] for entry in captures] == [capture.id]
+        assert client.get(f"/media/{capture.thumb_rel_path}").status_code == 200
 
 
 def test_existing_catalog_refreshes_after_item_changes(tmp_path):

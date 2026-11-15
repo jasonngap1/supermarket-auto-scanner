@@ -19,7 +19,10 @@
       <section id="tab-scan" class="tab active">
         <div class="scan-layout">
           <div class="camera-panel">
-            <video id="scan-video" autoplay playsinline muted></video>
+            <div class="camera-frame">
+              <video id="scan-video" autoplay playsinline muted></video>
+              <img id="scan-annotated" alt="Detected item" hidden />
+            </div>
             <div id="scan-status" class="scan-status">Starting camera…</div>
           </div>
 

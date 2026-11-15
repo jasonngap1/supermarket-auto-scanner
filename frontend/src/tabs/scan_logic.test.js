@@ -3,6 +3,7 @@ import {
   ADD_SCORE,
   RELEASE_FRAMES,
   SWITCH_FRAMES,
+  bestFromResponse,
   bestTop,
   createScanState,
   observeScan,
@@ -55,6 +56,30 @@ describe("scan gate", () => {
 
     const again = observeScan(state, milk);
     expect(again.added).toEqual(milk);
+  });
+
+  it("releases when frames report no detection and re-adds the same item", () => {
+    let state = observeScan(createScanState(), milk).state;
+    let released = false;
+    for (let index = 0; index < RELEASE_FRAMES; index += 1) {
+      const result = observeScan(
+        state,
+        bestFromResponse({ status: "no_detection", top_items: [] }),
+      );
+      state = result.state;
+      released = released || result.released;
+    }
+    expect(released).toBe(true);
+    expect(state.lockedItemId).toBeNull();
+
+    const again = observeScan(state, bestFromResponse({ status: "ok", top_items: [milk] }));
+    expect(again.added).toEqual(milk);
+  });
+
+  it("ignores item lists on non-ok responses", () => {
+    expect(bestFromResponse({ status: "no_detection", top_items: [milk] })).toBeNull();
+    expect(bestFromResponse({ status: "model_error", top_items: [milk] })).toBeNull();
+    expect(bestFromResponse({ status: "ok", top_items: [milk] })).toEqual(milk);
   });
 
   it("resets the absence streak when the item reappears", () => {

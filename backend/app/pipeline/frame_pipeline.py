@@ -1,113 +1,92 @@
 import time
+from dataclasses import dataclass, field
 
 import numpy as np
 
-from app.config import Settings
 from app.errors import ModelUnavailable
-from app.pipeline.mask_select import select_center_mask
-from app.pipeline.preprocess import (
-    EMBED_VARIANTS,
-    EMBED_VARIANT,
-    preprocess_for_variant,
-)
-from app.pipeline.prompts import build_center_prompt
 from app.pipeline.types import Localization
+from app.pipeline.variants import VARIANTS, preprocess_variant
+from app.pipeline.yolo import localize_with_yolo_sam
 
-EMBED_MODEL_KEY = "dinov2-small"
+
+@dataclass(frozen=True)
+class PipelineOutput:
+    localization: Localization
+    embeddings: dict[str, np.ndarray]
+    variant_status: dict[str, str]
+    timings_ms: dict[str, float]
+    embed_ms: dict[str, float] = field(default_factory=dict)
 
 
 class FramePipeline:
-    def __init__(self, registry, settings: Settings):
+    def __init__(self, registry, settings):
         self.registry = registry
         self.settings = settings
 
     def localize(self, image_rgb: np.ndarray) -> Localization:
-        """Enrollment-only item mask used for the gallery thumbnail."""
+        """YOLO box -> SAM2 mask, used to store the gallery thumbnail."""
         with self.registry.gate():
-            return self._localize(image_rgb)
+            return localize_with_yolo_sam(self.settings, self.registry, image_rgb)
 
-    def _localize(self, image_rgb: np.ndarray) -> Localization:
-        timings: dict[str, float] = {}
-        start = time.perf_counter()
-        try:
-            face = self.registry.detect_face(image_rgb)
-        except ModelUnavailable:
-            # Face rejection is best-effort; the centre point still works.
-            face = None
-        timings["face"] = (time.perf_counter() - start) * 1000
+    def analyze(self, image_rgb: np.ndarray, variant_ids: list[str]) -> PipelineOutput:
+        with self.registry.gate():
+            return self._analyze(image_rgb, variant_ids)
 
-        height, width = image_rgb.shape[:2]
-        prompt = build_center_prompt(
-            width,
-            height,
-            roi_width=self.settings.center_roi_width,
-            roi_height=self.settings.center_roi_height,
-            face_bbox=face.bbox if face is not None else None,
-        )
-        start = time.perf_counter()
-        candidates = self.registry.segment(image_rgb, prompt)
-        timings["sam2"] = (time.perf_counter() - start) * 1000
+    def _analyze(self, image_rgb: np.ndarray, variant_ids: list[str]) -> PipelineOutput:
+        unknown = [v for v in variant_ids if v not in VARIANTS]
+        if unknown:
+            raise ValueError(f"Unknown variants: {unknown}")
 
-        selection = select_center_mask(
-            candidates,
-            prompt.positive_points[0],
-            prompt.box,
-            width,
-            height,
-            face_bbox=face.bbox if face is not None else None,
-            min_area_ratio=self.settings.sam2_center_min_area_ratio,
-            max_area_ratio=self.settings.sam2_center_max_area_ratio,
-            min_pred_iou=self.settings.sam2_center_min_pred_iou,
-            max_border_fraction=self.settings.sam2_center_max_border_fraction,
-            face_iou_reject=self.settings.sam2_center_face_iou_reject,
-            face_coverage_reject=self.settings.sam2_center_face_coverage_reject,
-            roi_margin_ratio=self.settings.sam2_center_roi_margin_ratio,
-        )
-        if selection.selected is None:
-            return Localization(
-                prompt=prompt,
-                selection=selection,
-                mask=None,
-                status="mask_rejected",
-                timings_ms=timings,
-                face=face,
-            )
-        return Localization(
-            prompt=prompt,
-            selection=selection,
-            mask=selection.selected.mask,
-            status="ok",
+        needs_mask = any(VARIANTS[v].crop == "mask" for v in variant_ids)
+        localization = Localization()
+        if needs_mask:
+            try:
+                localization = localize_with_yolo_sam(
+                    self.settings, self.registry, image_rgb
+                )
+            except ModelUnavailable:
+                localization = Localization(status="model_error")
+
+        embeddings: dict[str, np.ndarray] = {}
+        statuses: dict[str, str] = {}
+        embed_ms: dict[str, float] = {}
+        preprocess_ms = 0.0
+
+        for variant_id in variant_ids:
+            variant = VARIANTS[variant_id]
+            if variant.crop == "mask":
+                if localization.status == "model_error":
+                    statuses[variant_id] = "model_error"
+                    continue
+                if localization.mask is None:
+                    statuses[variant_id] = (
+                        localization.status
+                        if localization.status in ("no_detection", "mask_rejected")
+                        else "mask_rejected"
+                    )
+                    continue
+            preprocess_start = time.perf_counter()
+            crop = preprocess_variant(image_rgb, variant, localization, self.settings)
+            preprocess_ms += (time.perf_counter() - preprocess_start) * 1000
+            if crop is None:
+                statuses[variant_id] = "mask_rejected"
+                continue
+            embed_start = time.perf_counter()
+            try:
+                embeddings[variant_id] = self.registry.embed(crop)
+                statuses[variant_id] = "ok"
+            except ModelUnavailable:
+                statuses[variant_id] = "model_error"
+            embed_ms[variant_id] = (time.perf_counter() - embed_start) * 1000
+
+        timings = dict(localization.timings_ms)
+        timings["preprocess"] = preprocess_ms
+        timings["embed"] = sum(embed_ms.values())
+        timings["total"] = sum(timings.values())
+        return PipelineOutput(
+            localization=localization,
+            embeddings=embeddings,
+            variant_status=statuses,
             timings_ms=timings,
-            face=face,
+            embed_ms=embed_ms,
         )
-
-    def embed_frame(self, image_rgb: np.ndarray) -> tuple[np.ndarray, dict[str, float]]:
-        """Whole-frame DINOv2 embedding."""
-        timings: dict[str, float] = {}
-        with self.registry.gate():
-            vector = self._embed_variant(image_rgb, EMBED_VARIANT, timings)
-        timings["total"] = sum(timings.values())
-        return vector, timings
-
-    def embed_frame_variants(
-        self, image_rgb: np.ndarray
-    ) -> tuple[dict[str, np.ndarray], dict[str, float]]:
-        """Whole-frame and centred-crop embeddings for background-robust matching."""
-        timings: dict[str, float] = {}
-        vectors: dict[str, np.ndarray] = {}
-        with self.registry.gate():
-            for variant in EMBED_VARIANTS:
-                vectors[variant] = self._embed_variant(image_rgb, variant, timings)
-        timings["total"] = sum(timings.values())
-        return vectors, timings
-
-    def _embed_variant(
-        self, image_rgb: np.ndarray, variant: str, timings: dict[str, float]
-    ) -> np.ndarray:
-        start = time.perf_counter()
-        crop = preprocess_for_variant(image_rgb, variant, self.settings.input_size)
-        timings[f"preprocess_{variant}"] = (time.perf_counter() - start) * 1000
-        start = time.perf_counter()
-        vector = self.registry.embed(crop)
-        timings[f"embed_{variant}"] = (time.perf_counter() - start) * 1000
-        return vector

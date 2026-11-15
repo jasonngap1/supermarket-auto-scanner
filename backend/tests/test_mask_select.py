@@ -1,71 +1,81 @@
 import numpy as np
 
-from app.pipeline.mask_select import mask_bbox, select_center_mask
+from app.pipeline.mask_select import select_box_mask
 from app.pipeline.types import MaskCandidate
 
+BOX = (30, 30, 70, 70)
 
-def make_mask(x1, y1, x2, y2, size=40):
-    mask = np.zeros((size, size), dtype=bool)
+
+def candidate(mask, pred_iou=0.9, index=0):
+    return MaskCandidate(index, mask, pred_iou)
+
+
+def mask_for(box):
+    mask = np.zeros((100, 100), dtype=bool)
+    x1, y1, x2, y2 = box
     mask[y1:y2, x1:x2] = True
     return mask
 
 
-def center_select(candidates, **kwargs):
-    return select_center_mask(
-        candidates,
-        (50, 50),
-        (20, 15, 80, 85),
-        100,
-        100,
-        min_area_ratio=0.005,
-        max_area_ratio=0.60,
-        min_pred_iou=0.5,
-        **kwargs,
-    )
+def select(candidates, yolo_box=BOX, **kwargs):
+    options = {"min_area_ratio": 0.005, "max_area_ratio": 0.60}
+    options.update(kwargs)
+    return select_box_mask(candidates, yolo_box, 100, 100, **options)
 
 
-def test_bbox_helper():
-    assert mask_bbox(make_mask(3, 4, 8, 9)) == (3, 4, 8, 9)
-    assert mask_bbox(np.zeros((5, 5), dtype=bool)) is None
-
-
-def test_center_rejects_face_and_border_masks():
-    item = MaskCandidate(0, make_mask(40, 40, 60, 60, size=100), 0.7)
-    face = MaskCandidate(1, make_mask(35, 35, 65, 65, size=100), 0.95)
-    result = center_select([item, face], face_bbox=(35, 35, 65, 65))
+def test_matching_mask_is_selected():
+    result = select([candidate(mask_for(BOX))])
     assert result.selected is not None
-    assert result.selected.index == 0
-    assert result.reasons[1] == "face_mask"
+    assert result.reasons == ["ok"]
 
-    border = np.zeros((100, 100), dtype=bool)
-    border[:3, :] = border[-3:, :] = True
-    border[:, :3] = border[:, -3:] = True
-    border[45:55, 45:55] = True
-    ring = MaskCandidate(2, border, 0.99)
-    result = select_center_mask(
-        [ring],
-        (50, 50),
-        None,
-        100,
-        100,
-        min_area_ratio=0.005,
-        max_area_ratio=0.60,
-        min_pred_iou=0.5,
+
+def test_low_pred_iou_is_rejected():
+    result = select([candidate(mask_for(BOX), pred_iou=0.3)])
+    assert result.selected is None
+    assert result.reasons == ["low_pred_iou"]
+
+
+def test_mask_outside_the_box_is_rejected():
+    result = select([candidate(mask_for((20, 30, 80, 70)))])
+    assert result.selected is None
+    assert result.reasons == ["outside_box"]
+
+
+def test_mask_with_low_box_iou_is_rejected():
+    result = select([candidate(mask_for((5, 5, 25, 25)))])
+    assert result.selected is None
+    assert result.reasons == ["low_box_iou"]
+
+
+def test_small_mask_is_rejected():
+    result = select([candidate(mask_for((50, 50, 51, 51)))])
+    assert result.selected is None
+    assert result.reasons == ["too_small"]
+
+
+def test_large_mask_is_rejected():
+    result = select([candidate(mask_for((10, 10, 90, 90)))])
+    assert result.selected is None
+    assert result.reasons == ["too_large"]
+
+
+def test_border_mask_is_rejected():
+    ring = np.zeros((100, 100), dtype=bool)
+    ring[0, :] = ring[-1, :] = ring[:, 0] = ring[:, -1] = True
+    result = select(
+        [candidate(ring)],
+        yolo_box=(0, 0, 100, 100),
+        max_area_ratio=1.1,
     )
     assert result.selected is None
-    assert result.reasons[0] == "touches_border"
+    assert result.reasons == ["border"]
 
 
-def test_center_rejects_mask_outside_the_centre_roi():
-    outside = MaskCandidate(0, make_mask(0, 40, 60, 60, size=100), 0.9)
-    result = center_select([outside])
-    assert result.selected is None
-    assert result.reasons[0] == "outside_roi"
-
-
-def test_center_rejects_low_confidence_and_small_masks():
-    low = MaskCandidate(0, make_mask(40, 40, 60, 60, size=100), 0.2)
-    tiny = MaskCandidate(1, make_mask(50, 50, 51, 51, size=100), 0.9)
-    result = center_select([low, tiny])
-    assert result.selected is None
-    assert result.reasons == ["low_iou", "area_too_small"]
+def test_highest_scoring_mask_wins():
+    result = select(
+        [
+            candidate(mask_for(BOX), pred_iou=0.6, index=0),
+            candidate(mask_for(BOX), pred_iou=0.9, index=1),
+        ]
+    )
+    assert result.selected.index == 1

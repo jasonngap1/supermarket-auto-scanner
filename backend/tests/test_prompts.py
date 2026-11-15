@@ -1,31 +1,17 @@
-from app.pipeline.prompts import build_center_prompt, center_roi_box
+from app.pipeline.prompts import build_box_prompt, clip_box
 
 
-def test_center_roi_is_centred_and_clipped():
-    box = center_roi_box(200, 100, width_ratio=0.5, height_ratio=0.6)
-    assert box == (50.0, 20.0, 150.0, 80.0)
-    clamped = center_roi_box(200, 100, width_ratio=2.0, height_ratio=2.0)
-    assert clamped == (0.0, 0.0, 199.0, 99.0)
+def test_clip_box_clamps_to_frame():
+    assert clip_box((-10, -5, 120, 80), 100, 60) == (0.0, 0.0, 100.0, 60.0)
 
 
-def test_center_prompt_uses_frame_centre_point_and_box():
-    prompt = build_center_prompt(200, 100, roi_width=0.5, roi_height=0.6)
-    assert prompt.mode == "sam2_center"
-    assert prompt.positive_points == [(100.0, 50.0)]
-    assert len(prompt.negative_points) == 12
-    assert all(
-        not (p[0] >= 50 and p[0] <= 150 and p[1] >= 20 and p[1] <= 80)
-        for p in prompt.negative_points
-    )
-    assert prompt.box == (50.0, 20.0, 150.0, 80.0)
+def test_build_box_prompt_uses_box_centre():
+    prompt = build_box_prompt((20, 30, 60, 90), 100, 100)
+    assert prompt.box == (20.0, 30.0, 60.0, 90.0)
+    assert prompt.positive_points == [(40.0, 60.0)]
 
 
-def test_center_prompt_adds_visible_face_negatives():
-    prompt = build_center_prompt(
-        200, 100, roi_width=0.5, roi_height=0.6, face_bbox=(160, 5, 195, 40)
-    )
-    assert len(prompt.negative_points) == 17
-    covering = build_center_prompt(
-        200, 100, roi_width=0.5, roi_height=0.6, face_bbox=(80, 30, 120, 70)
-    )
-    assert len(covering.negative_points) == 12
+def test_build_box_prompt_rejects_empty_box():
+    prompt = build_box_prompt((50, 50, 50, 50), 100, 100)
+    assert prompt.box is None
+    assert prompt.positive_points == []

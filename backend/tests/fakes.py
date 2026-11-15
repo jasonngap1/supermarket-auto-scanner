@@ -21,27 +21,22 @@ class FakeSam2:
         self.prompt = prompt
         height, width = image.shape[:2]
         if self.empty:
-            return [MaskCandidate(0, np.zeros((height, width), dtype=bool), 0.1)]
-        # Simulate a segmenter that covers the prompted positive point.
-        cx, cy = prompt.positive_points[0]
-        half = 15
-        x0, x1 = max(0, int(cx) - half), min(width, int(cx) + half)
-        y0, y1 = max(0, int(cy) - half), min(height, int(cy) + half)
+            return []
+        if prompt.box is not None:
+            x1, y1, x2, y2 = prompt.box
+        else:
+            cx, cy = width / 2.0, height / 2.0
+            x1, y1, x2, y2 = cx - 10, cy - 10, cx + 10, cy + 10
         mask = np.zeros((height, width), dtype=bool)
-        mask[y0:y1, x0:x1] = True
+        mask[
+            max(0, int(y1)) : min(height, int(y2)),
+            max(0, int(x1)) : min(width, int(x2)),
+        ] = True
         return [
             MaskCandidate(0, mask, 0.9),
             MaskCandidate(1, mask.copy(), 0.7),
             MaskCandidate(2, mask.copy(), 0.5),
         ]
-
-
-class FakeFace:
-    def __init__(self, asset_path=None):
-        self.asset_path = asset_path
-
-    def detect(self, image):
-        return None
 
 
 class FakeEmbedder:
@@ -58,17 +53,28 @@ class FakeEmbedder:
 
 
 class FakeRegistry:
-    def __init__(self, segmenter=None, embedder=None, face=None):
+    def __init__(
+        self,
+        segmenter=None,
+        embedder=None,
+        detections=None,
+        detect_error=None,
+    ):
         self.segmenter = segmenter or FakeSam2()
         self.embedder = embedder or FakeEmbedder()
-        self.face = face
+        self.detections = detections or []
+        self.detect_error = detect_error
+        self.detect_calls = 0
         self._gate = threading.RLock()
 
     def gate(self):
         return self._gate
 
-    def detect_face(self, image):
-        return self.face
+    def detect_objects(self, image):
+        self.detect_calls += 1
+        if self.detect_error is not None:
+            raise self.detect_error
+        return self.detections
 
     def segment(self, image, prompt):
         return self.segmenter.segment(image, prompt)

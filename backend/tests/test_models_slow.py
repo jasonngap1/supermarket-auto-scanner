@@ -27,13 +27,13 @@ def test_dinov2_embedding_contract():
 def test_sam2_returns_three_deterministic_masks():
     from app.config import Settings
     from app.ml.devices import resolve_device
-    from app.pipeline.prompts import build_center_prompt
     from app.pipeline.sam2 import Sam2Segmenter
+    from app.pipeline.types import PromptSpec
 
     settings = Settings()
     sam2 = Sam2Segmenter(settings.sam2_model_id, resolve_device(settings.device))
     image = np.full((480, 640, 3), 127, dtype=np.uint8)
-    prompt = build_center_prompt(640, 480)
+    prompt = PromptSpec([(320.0, 240.0)], (200.0, 150.0, 440.0, 330.0))
     first = sam2.segment(image, prompt)
     second = sam2.segment(image, prompt)
     assert len(first) == len(second) == 3
@@ -44,12 +44,19 @@ def test_sam2_returns_three_deterministic_masks():
         assert iou >= 0.9
 
 
-def test_face_asset_loads_and_handles_blank_frame():
-    from app.config import Settings
-    from app.pipeline.face import FaceDetector
+def test_yolo_contract():
+    if os.getenv("RUN_YOLO_TESTS") != "1":
+        pytest.skip("set RUN_YOLO_TESTS=1 with downloaded YOLO weights")
+    pytest.importorskip("ultralytics")
 
-    settings = Settings()
-    if not settings.face_asset.exists():
-        pytest.skip("blaze_face_short_range.tflite not downloaded")
-    detector = FaceDetector(settings.face_asset)
-    assert detector.detect(np.zeros((480, 640, 3), dtype=np.uint8)) is None
+    from app.config import Settings
+    from app.ml.registry import ModelRegistry
+
+    settings = Settings(warm_models=False)
+    registry = ModelRegistry(settings)
+    frame = np.full((480, 640, 3), 127, dtype=np.uint8)
+    detections = registry.detect_objects(frame)
+    assert isinstance(detections, list)
+    for detection in detections:
+        assert 0.0 <= detection.confidence <= 1.0
+        assert len(detection.bbox) == 4

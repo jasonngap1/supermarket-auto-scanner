@@ -17,6 +17,15 @@ export function bestTop(body) {
 }
 
 /**
+ * Only a successful match counts as a visible item. Detection failures and
+ * empty frames must reach observeScan as an absence so a locked gate can
+ * release and scan the next unit.
+ */
+export function bestFromResponse(body) {
+  return body?.status === "ok" ? bestTop(body) : null;
+}
+
+/**
  * One scan observation -> next gate state plus an item to add once.
  * A gate stays locked until the visible item disappears for RELEASE_FRAMES,
  * or a different item wins for SWITCH_FRAMES.

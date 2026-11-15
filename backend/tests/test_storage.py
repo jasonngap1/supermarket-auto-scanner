@@ -42,6 +42,15 @@ def test_save_capture_bundle_and_path_safety(tmp_path):
     assert len(sha256_hex(jpeg_bytes())) == 64
 
 
+def test_save_capture_bundle_without_mask(tmp_path):
+    settings = Settings(data_dir=tmp_path)
+    image, _width, _height = decode_image(jpeg_bytes(), max_bytes=10_000)
+    artifacts = save_capture_bundle(settings, item_id=7, image_rgb=image)
+    assert artifacts.mask_rel_path == ""
+    assert resolve_media_path(settings, artifacts.rel_path).exists()
+    assert resolve_media_path(settings, artifacts.thumb_rel_path).exists()
+
+
 def test_rejects_path_traversal(tmp_path):
     settings = Settings(data_dir=tmp_path)
     with pytest.raises(ValueError):

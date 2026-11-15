@@ -37,7 +37,6 @@ def make_capture(settings, item, artifacts, role="gallery", sha="a" * 64):
         height=32,
         mask_found=True,
         mask_status="ok",
-        localization={"status": "ok", "selection": {}},
     )
 
 

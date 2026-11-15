@@ -1,4 +1,3 @@
-import json
 import sqlite3
 from dataclasses import dataclass, fields
 from datetime import datetime, timezone
@@ -9,7 +8,6 @@ from app.config import Settings
 from app.db import db
 from app.domain import Capture, Role
 from app.errors import DuplicateCapture, ImageTooLarge, InvalidImage, ModelUnavailable
-from app.pipeline.types import Localization
 from app.services.catalog import sync_catalog
 from app.services.storage import (
     CaptureArtifacts,
@@ -26,9 +24,7 @@ def _now() -> str:
 
 def _row_to_capture(row: sqlite3.Row) -> Capture:
     data = dict(row)
-    data["hand_found"] = bool(data["hand_found"])
     data["mask_found"] = bool(data["mask_found"])
-    data["localization"] = json.loads(data.pop("localization_json"))
     allowed = {field.name for field in fields(Capture)}
     return Capture(**{key: value for key, value in data.items() if key in allowed})
 
@@ -43,9 +39,8 @@ def add_capture(
     sha256: str,
     width: int,
     height: int,
-    mask_found: bool,
-    mask_status: str,
-    localization: dict,
+    mask_found: bool = False,
+    mask_status: str = "not_localized",
 ) -> Capture:
     try:
         with db(settings) as connection:
@@ -53,15 +48,15 @@ def add_capture(
                 """
                 INSERT INTO captures (
                   item_id, role, session_id, rel_path, thumb_rel_path, mask_rel_path,
-                  sha256, width, height, hand_found, mask_found, mask_status,
+                  sha256, width, height, mask_found, mask_status,
                   localization_json, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     item_id, role, session_id, artifacts.rel_path,
                     artifacts.thumb_rel_path, artifacts.mask_rel_path, sha256,
-                    width, height, 0, int(mask_found), mask_status,
-                    json.dumps(localization), _now(),
+                    width, height, int(mask_found), mask_status,
+                    "{}", _now(),
                 ),
             )
             capture_id = int(cursor.lastrowid)
@@ -107,6 +102,8 @@ def list_gallery_captures(settings: Settings):
 
 def remove_capture_files(settings: Settings, capture: Capture) -> None:
     for rel_path in (capture.rel_path, capture.thumb_rel_path, capture.mask_rel_path):
+        if not rel_path:
+            continue
         try:
             resolve_media_path(settings, rel_path).unlink(missing_ok=True)
         except (OSError, ValueError):
@@ -171,30 +168,6 @@ def get_embedding(
     return np.frombuffer(row["vector"], dtype=np.float32).copy()
 
 
-def localization_to_dict(localization: Localization) -> dict:
-    selected = localization.selection.selected
-    return {
-        "prompt": None if localization.prompt is None else {
-            "positive_points": localization.prompt.positive_points,
-            "negative_points": localization.prompt.negative_points,
-            "box": localization.prompt.box,
-            "mode": localization.prompt.mode,
-        },
-        "selection": {
-            "selected_index": None if selected is None else selected.index,
-            "reasons": localization.selection.reasons,
-            "scores": localization.selection.scores,
-            "area_ratios": localization.selection.area_ratios,
-        },
-        "face": None if localization.face is None else {
-            "bbox": localization.face.bbox,
-            "score": localization.face.score,
-        },
-        "status": localization.status,
-        "timings_ms": localization.timings_ms,
-    }
-
-
 def capture_duplicate_exists(settings: Settings, item_id: int, role: str, sha256: str) -> bool:
     with db(settings) as connection:
         row = connection.execute(
@@ -230,10 +203,22 @@ class CaptureService:
             localization = self.pipeline.localize(image)
         except ModelUnavailable:
             return CaptureUploadResult(False, reason="model_error")
-        if localization.status != "ok" or localization.mask is None:
-            return CaptureUploadResult(False, reason=localization.status)
 
-        artifacts = save_capture_bundle(self.settings, item_id, image, localization.mask)
+        if (
+            localization.status != "ok"
+            or localization.mask is None
+            or localization.bbox is None
+        ):
+            reason = (
+                localization.status
+                if localization.status in ("no_detection", "mask_rejected", "model_error")
+                else "mask_rejected"
+            )
+            return CaptureUploadResult(False, reason=reason)
+
+        artifacts = save_capture_bundle(
+            self.settings, item_id, image, localization.mask
+        )
         try:
             capture = add_capture(
                 self.settings,
@@ -244,9 +229,8 @@ class CaptureService:
                 sha256=digest,
                 width=width,
                 height=height,
-                mask_found=localization.mask is not None,
-                mask_status=localization.status,
-                localization=localization_to_dict(localization),
+                mask_found=True,
+                mask_status="ok",
             )
         except DuplicateCapture:
             return CaptureUploadResult(False, reason="duplicate")

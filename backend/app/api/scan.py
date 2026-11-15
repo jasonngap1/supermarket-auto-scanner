@@ -1,3 +1,5 @@
+import base64
+
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from starlette.concurrency import run_in_threadpool
 
@@ -26,4 +28,5 @@ async def scan(image: UploadFile = File(...), state=Depends(get_state)):
         status=result.status,
         top_items=[TopItemOut(**item.__dict__) for item in result.top_items],
         timings_ms=result.timings_ms,
+        annotated_jpeg_b64=base64.b64encode(result.annotated_jpeg).decode(),
     )

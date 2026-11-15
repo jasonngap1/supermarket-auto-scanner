@@ -5,8 +5,8 @@ from app.config import Settings
 from app.errors import ModelUnavailable
 from app.ml.devices import resolve_device
 from app.pipeline.embedders import DinoV2Embedder
-from app.pipeline.face import FaceDetector
 from app.pipeline.sam2 import Sam2Segmenter
+from app.pipeline.yolo import YoloDetector
 
 
 class ModelRegistry:
@@ -14,26 +14,26 @@ class ModelRegistry:
         self,
         settings: Settings,
         *,
-        face_factory: Callable = FaceDetector,
         dinov2_factory: Callable = DinoV2Embedder,
         sam2_factory: Callable = Sam2Segmenter,
+        yolo_factory: Callable = YoloDetector,
     ):
         self.settings = settings
         self._gate = RLock()
         self._device = resolve_device(settings.device)
         self._force_cpu: set[str] = set()
         self._factories = {
-            "face": face_factory,
             "dinov2": dinov2_factory,
             "sam2": sam2_factory,
+            "yolo": yolo_factory,
         }
-        self._face = None
         self._embedder = None
         self._sam2 = None
+        self._yolo = None
         self._errors: dict[str, str | None] = {
-            "face": None,
             "dinov2": None,
             "sam2": None,
+            "yolo": None,
         }
 
     def gate(self) -> RLock:
@@ -42,31 +42,20 @@ class ModelRegistry:
     def _device_for(self, name: str) -> str:
         return "cpu" if name in self._force_cpu else self._device
 
-    def _ensure_face(self) -> None:
-        if self._face is not None:
-            return
-        try:
-            self._face = self._factories["face"](asset_path=self.settings.face_asset)
-            self._errors["face"] = None
-        except Exception as exc:
-            self._errors["face"] = str(exc)
-            raise ModelUnavailable(str(exc)) from exc
+    def _ensure_embedder(self):
+        if self._embedder is None:
+            try:
+                self._embedder = self._factories["dinov2"](
+                    model_id=self.settings.dinov2_model_id,
+                    device=self._device_for("dinov2"),
+                )
+                self._errors["dinov2"] = None
+            except Exception as exc:
+                self._errors["dinov2"] = str(exc)
+                raise ModelUnavailable(str(exc)) from exc
+        return self._embedder
 
-    def _ensure_embedder(self) -> DinoV2Embedder:
-        if self._embedder is not None:
-            return self._embedder
-        try:
-            self._embedder = self._factories["dinov2"](
-                model_id=self.settings.dinov2_model_id,
-                device=self._device_for("dinov2"),
-            )
-            self._errors["dinov2"] = None
-            return self._embedder
-        except Exception as exc:
-            self._errors["dinov2"] = str(exc)
-            raise ModelUnavailable(str(exc)) from exc
-
-    def _ensure_sam2(self) -> Sam2Segmenter:
+    def _ensure_sam2(self):
         if self._sam2 is None:
             try:
                 self._sam2 = self._factories["sam2"](
@@ -79,22 +68,31 @@ class ModelRegistry:
                 raise ModelUnavailable(str(exc)) from exc
         return self._sam2
 
+    def _ensure_yolo(self):
+        if self._yolo is None:
+            try:
+                self._yolo = self._factories["yolo"](
+                    model_id=self.settings.yolo_det_model_id,
+                    device=self._device_for("yolo"),
+                    conf=self.settings.yolo_conf,
+                    iou=self.settings.yolo_iou,
+                    imgsz=self.settings.yolo_imgsz,
+                    allowed_classes=self.settings.yolo_allowed_classes,
+                    weights_dir=self.settings.data_dir / "weights",
+                )
+                self._errors["yolo"] = None
+            except Exception as exc:
+                self._errors["yolo"] = str(exc)
+                raise ModelUnavailable(str(exc)) from exc
+        return self._yolo
+
     def warm(self) -> None:
         with self._gate:
-            for ensure in (self._ensure_face, self._ensure_embedder):
+            for ensure in (self._ensure_embedder, self._ensure_sam2, self._ensure_yolo):
                 try:
                     ensure()
                 except ModelUnavailable:
                     pass
-
-    def detect_face(self, image):
-        with self._gate:
-            self._ensure_face()
-            try:
-                return self._face.detect(image)
-            except Exception as exc:
-                self._errors["face"] = str(exc)
-                raise ModelUnavailable(str(exc)) from exc
 
     def embed(self, image):
         with self._gate:
@@ -110,6 +108,14 @@ class ModelRegistry:
                 "sam2",
                 lambda: self._ensure_sam2().segment(image, prompt),
                 reload=lambda: setattr(self, "_sam2", None),
+            )
+
+    def detect_objects(self, image):
+        with self._gate:
+            return self._call_with_fallback(
+                "yolo",
+                lambda: self._ensure_yolo().predict(image),
+                reload=lambda: setattr(self, "_yolo", None),
             )
 
     def _call_with_fallback(self, name: str, call, reload):
@@ -131,20 +137,23 @@ class ModelRegistry:
         return {
             "device": {"preference": self.settings.device, "resolved": self._device},
             "models": {
-                "face": {
-                    "loaded": self._face is not None,
-                    "device": "cpu",
-                    "error": self._errors["face"],
-                },
                 "dinov2": {
                     "loaded": self._embedder is not None,
                     "device": self._device_for("dinov2"),
                     "error": self._errors["dinov2"],
+                    "model_id": self.settings.dinov2_model_id,
                 },
                 "sam2": {
                     "loaded": self._sam2 is not None,
                     "device": self._device_for("sam2"),
                     "error": self._errors["sam2"],
+                    "model_id": self.settings.sam2_model_id,
+                },
+                "yolo": {
+                    "loaded": self._yolo is not None,
+                    "device": self._device_for("yolo"),
+                    "error": self._errors["yolo"],
+                    "model_id": self.settings.yolo_det_model_id,
                 },
             },
         }

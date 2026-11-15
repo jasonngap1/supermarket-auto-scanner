@@ -102,9 +102,11 @@ async function capture(button) {
       const reason = result.rejected[0]?.reason || "unknown";
       const message =
         {
-          mask_rejected: "item not found — hold it in the centre of the frame",
           duplicate: "duplicate image",
-          model_error: "model unavailable",
+          invalid_image: "unreadable image",
+          no_detection: "no item detected",
+          mask_rejected: "item mask could not be found",
+          model_error: "models unavailable",
         }[reason] || reason;
       status.textContent = `Rejected: ${message} — retake.`;
     }

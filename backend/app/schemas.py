@@ -57,3 +57,4 @@ class ScanOut(BaseModel):
     status: str
     top_items: list[TopItemOut]
     timings_ms: dict[str, float]
+    annotated_jpeg_b64: str

@@ -3,11 +3,9 @@
 Local scanner app: hold an item in front of the camera, the app recognizes it,
 and adds it to a running cart with quantity, prices, and an order total.
 
-Recognition compares the whole camera frame and a centred item crop against the
-enrolled gallery. Matching takes the best score across both views, so a changed
-background is less likely to hide the item. SAM2 and face detection are used
-only when enrolling an item, to create a segmented gallery thumbnail for the
-cart.
+Recognition uses YOLO26n to find the item box, SAM2 to segment that box, and
+DINOv2 to embed the mask crop. The same chain runs when enrolling a gallery
+photo, so gallery and live vectors describe the same view.
 
 ## Requirements
 
@@ -26,8 +24,8 @@ cd ../frontend
 npm install
 ```
 
-The download is roughly 250 MB: SAM2, DINOv2, and the MediaPipe face detector.
-Weights, model assets, and the SQLite database live under `data/` (gitignored).
+The download is roughly 250 MB: YOLO26n, SAM2, and DINOv2. Weights, caches, and
+the SQLite database live under `data/` (gitignored).
 
 ## Run
 
@@ -49,12 +47,40 @@ and device status.
 ## Use
 
 1. Open **Items**, add a name and price, and capture at least one gallery photo
-   per item. Hold the item in the centre of the frame while capturing. The
-   stored thumbnail is segmented and is used as the cart image.
+   per item. Show one item at a time. A frame is stored only when YOLO finds an
+   item box and SAM2 returns an accepted mask; the segmented thumbnail is used
+   in the cart.
 2. Open **Scan** and show one item at a time to the camera. Scanning starts
-   automatically.
+   automatically. A frame with no detection reports `no_detection`; it does not
+   match against the gallery.
 3. The cart shows the item image, name, quantity, unit price, line total, and
    order total. Use the remove button on a line or **Clear** for the whole cart.
+
+### Detection pipeline
+
+1. YOLO detects objects. One box is selected by confidence minus a
+   centre-distance penalty; `person` is rejected by default, as are boxes that
+   are too small, too large, or touch the frame border.
+2. SAM2 is prompted with the box and its centre point and returns three mask
+   candidates.
+3. A mask is rejected when its predicted IoU, overlap with the YOLO box, area,
+   or border leakage is outside the configured limits.
+4. The mask crop is letterboxed to 224x224 and embedded with DINOv2.
+
+YOLO class names are only used for filtering, never for recognition. Class
+coverage is the limiting factor: a product outside the 80 COCO classes produces
+no detection. Tune `AUTO_SCANNER_YOLO_CONF` and the mask thresholds in
+`.env.example` if needed.
+
+### Enrollment
+
+Enrollment runs YOLO -> SAM2 and stores the image, mask, and segmented
+thumbnail only when the frame has both a bounding box and an accepted mask.
+Frames with no detection are rejected with `no_detection`; frames where the
+mask fails selection are rejected with `mask_rejected`. Retake with one item
+centred in the frame.
+
+The gallery vector is computed on first scan from the stored mask.
 
 ### Duplicate guard
 
@@ -72,9 +98,12 @@ The thresholds live at the top of `frontend/src/tabs/scan_logic.js`.
 
 ## Storage
 
-SQLite at `data/app.db`; media under `data/media`. Gallery captures, masks, and
-segmented thumbnails are stored per item. Enrollment rejects duplicate images
-and frames where the centre localizer finds no item mask.
+SQLite at `data/app.db`; media under `data/media`. Gallery images, masks, and
+thumbnails are stored per item. Enrollment rejects duplicate images and frames
+without an accepted item mask.
+
+Existing databases keep working. Older captures may still have an empty mask
+path. No schema migration is required.
 
 ### Shared enrolled catalog
 
@@ -96,8 +125,20 @@ uv run python ../scripts/export_catalog.py
 existing local database is never overwritten; delete it only if you intend to
 replace local items with the repository snapshot.
 
-Existing databases from the earlier validation lab keep their old tables and
-V1/V2/V3 embeddings; the scanner ignores them.
+Older catalog entries without a mask are still seeded without one. Their
+gallery vectors are recomputed with the current detection settings on first
+scan and skipped when no mask can be found.
+
+## Performance on the M1
+
+Measured with the validation lab's benchmark on five stored captures:
+
+- YOLO detection: p50 ~25 ms.
+- SAM2 segmentation: ~0.42 s per accepted frame.
+- Warm DINOv2: ~20 ms.
+- End-to-end mask vector: roughly 0.45-0.5 s.
+
+The frontend scans about once per second and skips overlapping requests.
 
 ## Tests
 
@@ -110,12 +151,18 @@ Slow model checks, after downloading weights:
 
 ```bash
 cd backend && RUN_MODEL_TESTS=1 uv run pytest -m slow -q
+# Include the YOLO weight check:
+cd backend && RUN_MODEL_TESTS=1 RUN_YOLO_TESTS=1 uv run pytest -m slow -q
 ```
 
 ## Notes
 
-- Matching also uses a fixed centre crop of the held item, which reduces the
-  effect of a changed background. Keep the item centred in the frame.
+- `v2` (YOLO box -> SAM2 mask -> DINOv2) is the only matching view. The
+  whole-frame control variant remains in the pipeline code for comparison.
 - The frontend shows no model names, scores, or timings.
+- Matching is exact cosine. HNSW is deferred behind `VectorIndex`.
+- Ultralytics and the YOLO26 weights are AGPL-3.0. This is acceptable for the
+  local app; commercial distribution requires a licence review or a commercial
+  licence.
 - DINOv2 weight licensing must be verified before commercial use.
 - Local-only: backend binds to `127.0.0.1`; data never leaves the machine.

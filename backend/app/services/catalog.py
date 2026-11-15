@@ -92,6 +92,8 @@ def export_catalog(settings: Settings) -> None:
     for capture in captures:
         for field in _ARTIFACT_FIELDS:
             rel = capture[field]
+            if not rel:
+                continue
             _safe_rel_path(rel)
             source = resolve_media_path(settings, rel)
             destination = media_root / rel
