@@ -21,7 +21,6 @@ class VariantAnalysis:
 class AnalyzeResult:
     frame_id: str
     annotated_jpeg: bytes
-    hand_found: bool
     mask_found: bool
     mask_status: str
     variants: list[VariantAnalysis]
@@ -73,7 +72,6 @@ class AnalysisService:
         return AnalyzeResult(
             frame_id=uuid.uuid4().hex,
             annotated_jpeg=annotated,
-            hand_found=output.localization.hand is not None,
             mask_found=output.localization.mask is not None,
             mask_status=output.localization.status,
             variants=variants,

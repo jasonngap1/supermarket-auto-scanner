@@ -1,4 +1,5 @@
 import json
+import time
 from datetime import datetime, timezone
 
 import numpy as np
@@ -8,7 +9,7 @@ from app.evaluation.artifacts import save_failure_artifact
 from app.evaluation.metrics import SampleResult, compute_metrics
 from app.matching.matcher import item_topk
 from app.matching.vector_index import normalize
-from app.services.captures import list_test_captures, load_capture_localization
+from app.services.captures import list_test_captures
 from app.services.storage import load_image_rgb
 
 
@@ -30,27 +31,19 @@ class EvaluationRunner:
         done = 0
 
         for capture in captures:
-            image = load_image_rgb(self.settings, capture.rel_path)
-            localization = load_capture_localization(self.settings, capture)
-            localization_ms = capture.localization.get("timings_ms", {})
+            image = None
             for variant in variant_ids:
-                embed_ms = 0.0
                 match_ms = 0.0
-                status = "ok"
+                top = []
                 try:
-                    import time
-
-                    embed_start = time.perf_counter()
-                    vector = self.embeddings.get_capture_vector(capture, variant)
-                    embed_ms = (time.perf_counter() - embed_start) * 1000
-                    if vector is None:
-                        status = "mask_rejected"
-                        top = []
-                    else:
+                    details = self.embeddings.get_capture_vector_details(capture, variant)
+                    vector = details.vector
+                    status = details.status
+                    timings = dict(details.timings_ms)
+                    if vector is not None:
                         entries = gallery[variant]
                         if not entries:
                             status = "no_gallery"
-                            top = []
                         else:
                             if any(
                                 entry.vectors.size
@@ -63,11 +56,10 @@ class EvaluationRunner:
                             match_ms = (time.perf_counter() - match_start) * 1000
                 except Exception:
                     status = "model_error"
-                    top = []
-                timings = {
-                    **localization_ms, "embed": embed_ms, "match": match_ms,
-                    "total": embed_ms + match_ms + sum(localization_ms.values()),
-                }
+                    timings = {}
+
+                timings["match"] = match_ms
+                timings["total"] = sum(timings.values())
                 sample = SampleResult(
                     true_item_id=capture.item_id,
                     true_item_name=capture.item_name,
@@ -75,17 +67,17 @@ class EvaluationRunner:
                     top=top,
                     status=status,
                     timings_ms=timings,
-                    hand_found=bool(capture.localization.get("hand")),
                 )
                 samples[variant].append(sample)
                 correct1 = bool(top and top[0].item_id == capture.item_id)
                 correct5 = any(item.item_id == capture.item_id for item in top[:5])
                 artifact = None
                 if status != "ok" or not correct1:
+                    if image is None:
+                        image = load_image_rgb(self.settings, capture.rel_path)
                     artifact = save_failure_artifact(
                         self.settings, run_id, f"{capture.id}-{variant}",
-                        image, localization, capture.item_name,
-                        top[0] if top else None,
+                        image, capture.item_name, top[0] if top else None,
                     )
                 with db(self.settings) as connection:
                     connection.execute(

@@ -1,17 +1,20 @@
 from io import BytesIO
 
-import numpy as np
 from PIL import Image
 
 from app.domain import TopItem
 from app.pipeline.annotate import annotate_frame
 from app.pipeline.frame_pipeline import FramePipeline
+from app.pipeline.types import Detection
 from tests.fakes import FakeRegistry, image, make_settings
 
 
 def test_annotate_returns_decodable_jpeg(tmp_path):
     settings = make_settings(tmp_path)
-    pipeline = FramePipeline(FakeRegistry(), settings)
+    pipeline = FramePipeline(
+        FakeRegistry(detections=[Detection(0, 46, "banana", 0.9, (20, 20, 80, 80))]),
+        settings,
+    )
     frame = image()
     output = pipeline.analyze(frame, ["v2"])
     jpeg = annotate_frame(
@@ -23,3 +26,9 @@ def test_annotate_returns_decodable_jpeg(tmp_path):
     decoded = Image.open(BytesIO(jpeg))
     assert decoded.format == "JPEG"
     assert decoded.size == (100, 100)
+
+
+def test_annotate_accepts_missing_localization():
+    jpeg = annotate_frame(image(), None, None, label="true: Milk | pred: none")
+    decoded = Image.open(BytesIO(jpeg))
+    assert decoded.format == "JPEG"

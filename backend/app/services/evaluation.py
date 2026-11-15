@@ -45,8 +45,6 @@ class EvaluationService:
     def _validate(self, variant_ids, item_ids):
         if not variant_ids or any(variant not in VARIANTS for variant in variant_ids):
             raise ValueError("Select at least one valid variant")
-        if "v3" in variant_ids and not self.settings.enable_clip:
-            raise ValueError("V3 requires CLIP (AUTO_SCANNER_ENABLE_CLIP=1)")
         items = list_items(self.settings)
         if item_ids:
             items = [item for item in items if item.id in set(item_ids)]

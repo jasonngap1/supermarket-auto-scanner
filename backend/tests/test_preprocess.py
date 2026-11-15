@@ -1,6 +1,6 @@
 import numpy as np
 
-from app.pipeline.preprocess import PREPROCESS_VERSION, crop_box, crop_mask, letterbox
+from app.pipeline.preprocess import PREPROCESS_VERSION, crop_mask, letterbox
 
 
 def test_letterbox_preserves_aspect_and_pads():
@@ -22,8 +22,5 @@ def test_crop_mask_grays_outside_mask():
     assert tuple(out[10, 10]) == (127, 127, 127)
 
 
-def test_crop_box_clips_and_version():
-    image = np.zeros((20, 20, 3), dtype=np.uint8)
-    crop = crop_box(image, (-5, -5, 10, 10), margin_ratio=0.0)
-    assert crop.shape[:2] == (10, 10)
+def test_preprocess_version_is_stable():
     assert PREPROCESS_VERSION == "letterbox224-gray10-v1"

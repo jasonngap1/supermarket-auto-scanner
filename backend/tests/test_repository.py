@@ -20,8 +20,7 @@ def setup_item(tmp_path):
     init_db(settings)
     item = create_item(settings, "Milk", 199)
     image = np.full((32, 32, 3), 128, dtype=np.uint8)
-    mask = np.ones((32, 32), dtype=bool)
-    artifacts = save_capture_bundle(settings, item.id, image, mask)
+    artifacts = save_capture_bundle(settings, item.id, image)
     return settings, item, artifacts
 
 
@@ -35,10 +34,6 @@ def make_capture(settings, item, artifacts, role="gallery", sha="a" * 64):
         sha256=sha,
         width=32,
         height=32,
-        hand_found=True,
-        mask_found=True,
-        mask_status="ok",
-        localization={"hand": {}, "selection": {}},
     )
 
 
@@ -46,6 +41,9 @@ def test_capture_duplicate_and_cascade_delete(tmp_path):
     settings, item, artifacts = setup_item(tmp_path)
     capture = make_capture(settings, item, artifacts)
     assert list_captures(settings, item.id)[0].id == capture.id
+    assert capture.mask_found is False
+    assert capture.mask_status == "not_localized"
+    assert capture.mask_rel_path == ""
     with pytest.raises(DuplicateCapture):
         make_capture(settings, item, artifacts)
     assert delete_capture(settings, item.id, capture.id) is True
@@ -60,4 +58,4 @@ def test_embedding_round_trip(tmp_path):
     loaded = get_embedding(settings, capture.id, "v2", "dinov2-small", "prep-v1")
     assert loaded is not None
     assert np.allclose(loaded, vector)
-    assert get_embedding(settings, capture.id, "v3", "clip", "prep-v1") is None
+    assert get_embedding(settings, capture.id, "v0", "dinov2-small", "prep-v1") is None

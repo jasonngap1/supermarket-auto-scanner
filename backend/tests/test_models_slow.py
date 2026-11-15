@@ -33,7 +33,7 @@ def test_sam2_returns_three_deterministic_masks():
     settings = Settings()
     sam2 = Sam2Segmenter(settings.sam2_model_id, resolve_device(settings.device))
     image = np.full((480, 640, 3), 127, dtype=np.uint8)
-    prompt = PromptSpec([(320.0, 240.0)], [], (200.0, 150.0, 440.0, 330.0), "pinch_roi")
+    prompt = PromptSpec([(320.0, 240.0)], (200.0, 150.0, 440.0, 330.0))
     first = sam2.segment(image, prompt)
     second = sam2.segment(image, prompt)
     assert len(first) == len(second) == 3
@@ -44,63 +44,19 @@ def test_sam2_returns_three_deterministic_masks():
         assert iou >= 0.9
 
 
-def test_sam3_litetext_segment_contract():
-    if os.getenv("RUN_SAM3_TESTS") != "1":
-        pytest.skip("set RUN_SAM3_TESTS=1 to load the SAM3-LiteText weights")
+def test_yolo_contract():
+    if os.getenv("RUN_YOLO_TESTS") != "1":
+        pytest.skip("set RUN_YOLO_TESTS=1 with downloaded YOLO weights")
+    pytest.importorskip("ultralytics")
+
     from app.config import Settings
-    from app.ml.devices import resolve_device
-    from app.pipeline.prompts import build_sam3_prompt
-    from app.pipeline.sam3 import Sam3LiteSegmenter
+    from app.ml.registry import ModelRegistry
 
-    settings = Settings()
-    segmenter = Sam3LiteSegmenter(
-        settings.sam3_model_id,
-        resolve_device(settings.device),
-        min_score=settings.sam3_min_score,
-        max_candidates=4,
-    )
-    image = np.full((480, 640, 3), 127, dtype=np.uint8)
-    prompt = build_sam3_prompt(640, 480, "object")
-    masks = segmenter.segment(image, prompt)
-    assert isinstance(masks, list)
-    assert len(masks) <= 4
-    for mask in masks:
-        assert mask.mask.shape == (480, 640)
-        assert mask.mask.dtype == bool
-        assert 0.0 <= mask.pred_iou <= 1.0
-
-
-def test_face_asset_loads_and_handles_blank_frame():
-    from app.config import Settings
-    from app.pipeline.face import FaceDetector
-
-    settings = Settings()
-    if not settings.face_asset.exists():
-        pytest.skip("blaze_face_short_range.tflite not downloaded")
-    detector = FaceDetector(settings.face_asset)
-    assert detector.detect(np.zeros((480, 640, 3), dtype=np.uint8)) is None
-
-
-def test_hand_asset_loads_and_handles_blank_frame():
-    from app.config import Settings
-    from app.pipeline.hand import HandDetector
-
-    settings = Settings()
-    if not settings.hand_asset.exists():
-        pytest.skip("hand_landmarker.task not downloaded")
-    detector = HandDetector(settings.hand_asset)
-    assert detector.detect(np.zeros((480, 640, 3), dtype=np.uint8)) is None
-
-
-def test_clip_embedding_contract_when_enabled():
-    if os.getenv("AUTO_SCANNER_ENABLE_CLIP") != "1":
-        pytest.skip("CLIP disabled")
-    from app.config import Settings
-    from app.ml.devices import resolve_device
-    from app.pipeline.embedders import ClipEmbedder
-
-    settings = Settings(enable_clip=True)
-    embedder = ClipEmbedder(settings.clip_model_id, resolve_device(settings.device))
-    vector = embedder.embed(np.full((224, 224, 3), 127, dtype=np.uint8))
-    assert vector.shape == (512,)
-    assert np.isclose(np.linalg.norm(vector), 1.0, atol=1e-3)
+    settings = Settings(warm_models=False)
+    registry = ModelRegistry(settings)
+    frame = np.full((480, 640, 3), 127, dtype=np.uint8)
+    detections = registry.detect_objects(frame)
+    assert isinstance(detections, list)
+    for detection in detections:
+        assert 0.0 <= detection.confidence <= 1.0
+        assert len(detection.bbox) == 4

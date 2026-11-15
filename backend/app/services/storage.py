@@ -44,24 +44,31 @@ def resolve_media_path(settings: Settings, rel_path: str) -> Path:
 
 
 def save_capture_bundle(
-    settings: Settings, item_id: int, image_rgb: np.ndarray, mask: np.ndarray
+    settings: Settings,
+    item_id: int,
+    image_rgb: np.ndarray,
+    mask: np.ndarray | None = None,
 ) -> CaptureArtifacts:
     stem = uuid.uuid4().hex
     image_rel = f"images/{item_id}/{stem}.jpg"
-    mask_rel = f"masks/{stem}.png"
+    mask_rel = f"masks/{stem}.png" if mask is not None else ""
     thumb_rel = f"thumbs/{stem}.jpg"
 
     image_path = resolve_media_path(settings, image_rel)
     image_path.parent.mkdir(parents=True, exist_ok=True)
     Image.fromarray(image_rgb).save(image_path, format="JPEG", quality=90)
 
-    mask_path = resolve_media_path(settings, mask_rel)
-    mask_path.parent.mkdir(parents=True, exist_ok=True)
-    Image.fromarray((mask.astype(np.uint8) * 255)).save(mask_path, format="PNG")
+    if mask is not None:
+        mask_path = resolve_media_path(settings, mask_rel)
+        mask_path.parent.mkdir(parents=True, exist_ok=True)
+        Image.fromarray((mask.astype(np.uint8) * 255)).save(mask_path, format="PNG")
+        overlay = image_rgb.astype(np.float32).copy()
+        overlay[mask] = overlay[mask] * 0.55 + np.array([0, 120, 255]) * 0.45
+        thumb_image = overlay.clip(0, 255).astype(np.uint8)
+    else:
+        thumb_image = image_rgb
 
-    overlay = image_rgb.astype(np.float32).copy()
-    overlay[mask] = overlay[mask] * 0.55 + np.array([0, 120, 255]) * 0.45
-    thumb = Image.fromarray(overlay.clip(0, 255).astype(np.uint8))
+    thumb = Image.fromarray(thumb_image)
     thumb.thumbnail((settings.thumb_max_px, settings.thumb_max_px))
     thumb_path = resolve_media_path(settings, thumb_rel)
     thumb_path.parent.mkdir(parents=True, exist_ok=True)
@@ -73,8 +80,3 @@ def save_capture_bundle(
 def load_image_rgb(settings: Settings, rel_path: str) -> np.ndarray:
     with Image.open(resolve_media_path(settings, rel_path)) as image:
         return np.asarray(image.convert("RGB"), dtype=np.uint8)
-
-
-def load_mask(settings: Settings, rel_path: str) -> np.ndarray:
-    with Image.open(resolve_media_path(settings, rel_path)) as image:
-        return np.asarray(image.convert("L"), dtype=np.uint8) > 127

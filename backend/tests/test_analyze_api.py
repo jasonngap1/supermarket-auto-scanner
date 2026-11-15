@@ -8,7 +8,7 @@ from app.dependencies import AppState
 from app.matching.matcher import GalleryEntry
 from app.main import create_app
 from app.pipeline.frame_pipeline import PipelineOutput
-from app.pipeline.types import Localization, MaskSelection
+from app.pipeline.types import Localization
 from app.services.analysis import AnalysisService
 from tests.fakes import make_settings
 
@@ -18,13 +18,22 @@ class FakePipeline:
         mask = np.zeros(image.shape[:2], dtype=bool)
         mask[10:40, 10:40] = True
         localization = Localization(
-            None, None, MaskSelection(None, [], [], []), mask, "ok", {}
+            status="ok",
+            mask=mask,
+            bbox=(10, 10, 40, 40),
+            timings_ms={"yolo": 1.0, "sam2": 2.0},
         )
         return PipelineOutput(
             localization=localization,
             embeddings={v: np.array([1, 0, 0, 0], dtype=np.float32) for v in variant_ids},
             variant_status={v: "ok" for v in variant_ids},
-            timings_ms={"hand": 1.0, "sam2": 2.0, "preprocess": 3.0, "embed": 4.0, "total": 10.0},
+            timings_ms={
+                "yolo": 1.0,
+                "sam2": 2.0,
+                "preprocess": 3.0,
+                "embed": 4.0,
+                "total": 10.0,
+            },
             embed_ms={v: 4.0 for v in variant_ids},
         )
 
@@ -63,7 +72,7 @@ def test_analyze_returns_top_items_and_annotated_image(tmp_path):
         )
     assert response.status_code == 200
     body = response.json()
-    assert body["hand_found"] is False
+    assert body["mask_found"] is True
     assert len(body["variants"]) == 2
     assert body["variants"][0]["top_items"][0]["name"] == "Milk 1L"
     assert body["variants"][0]["top_items"][0]["price_cents"] == 199

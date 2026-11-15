@@ -19,7 +19,7 @@ function renderVariants() {
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
     checkbox.value = variant.id;
-    checkbox.checked = variant.id !== "v3";
+    checkbox.checked = true;
     checkbox.addEventListener("change", () => {
       if (checkbox.checked) selected.add(variant.id);
       else selected.delete(variant.id);

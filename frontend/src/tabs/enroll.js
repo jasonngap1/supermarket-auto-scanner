@@ -73,7 +73,7 @@ async function refreshCaptures() {
     image.src = `/media/${capture.thumb_rel_path}`;
     image.alt = `${capture.role} capture`;
     const caption = document.createElement("figcaption");
-    caption.textContent = `${capture.role} · ${capture.mask_status}`;
+    caption.textContent = capture.role;
     const remove = document.createElement("button");
     remove.type = "button";
     remove.textContent = "Delete";
@@ -91,7 +91,7 @@ async function capture(role, button) {
   if (!selectedItem) return;
   button.disabled = true;
   const status = document.getElementById("enroll-status");
-  status.textContent = "Capturing and segmenting…";
+  status.textContent = "Uploading…";
   try {
     const blob = await captureFrame(document.getElementById("enroll-video"));
     const result = await uploadCaptures(
@@ -112,10 +112,7 @@ async function capture(role, button) {
       const reason = result.rejected[0]?.reason || "unknown";
       const message =
         {
-          mask_rejected: "item not found — hold it in the centre of the frame",
-          no_hand: "no hand detected — hold the item up to the camera",
           duplicate: "duplicate image",
-          model_error: "model unavailable",
         }[reason] || reason;
       status.textContent = `Rejected: ${message} — retake.`;
     }

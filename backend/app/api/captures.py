@@ -19,7 +19,7 @@ def _capture_out(capture) -> CaptureOut:
         id=capture.id, item_id=capture.item_id, role=capture.role,
         session_id=capture.session_id, rel_path=capture.rel_path,
         thumb_rel_path=capture.thumb_rel_path, mask_rel_path=capture.mask_rel_path,
-        width=capture.width, height=capture.height, hand_found=capture.hand_found,
+        width=capture.width, height=capture.height,
         mask_found=capture.mask_found, mask_status=capture.mask_status,
     )
 

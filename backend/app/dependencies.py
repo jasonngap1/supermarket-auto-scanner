@@ -34,7 +34,7 @@ def build_default_state(settings: Settings) -> AppState:
         settings,
         registry=registry,
         pipeline=pipeline,
-        captures=CaptureService(settings, pipeline, embeddings),
+        captures=CaptureService(settings, embeddings),
         analysis=AnalysisService(settings, pipeline, embeddings),
         evaluation=EvaluationService(settings, embeddings),
     )

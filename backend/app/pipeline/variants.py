@@ -4,26 +4,22 @@ from typing import Literal
 import numpy as np
 
 from app.config import Settings
-from app.pipeline.preprocess import crop_box, crop_mask, letterbox
-from app.pipeline.prompts import hand_crop_box
+from app.pipeline.preprocess import PREPROCESS_VERSION, crop_mask, letterbox
 from app.pipeline.types import Localization
 
-MODEL_KEYS = {"dinov2": "dinov2-small", "clip": "clip-vit-b32"}
+MODEL_KEY = "dinov2-small"
 
 
 @dataclass(frozen=True)
 class Variant:
     id: str
     label: str
-    crop: Literal["whole", "hand", "mask"]
-    embedder: Literal["dinov2", "clip"]
+    crop: Literal["whole", "mask"]
 
 
 VARIANTS: dict[str, Variant] = {
-    "v0": Variant("v0", "Whole frame + DINOv2", "whole", "dinov2"),
-    "v1": Variant("v1", "Hand crop + DINOv2", "hand", "dinov2"),
-    "v2": Variant("v2", "Mask crop + DINOv2", "mask", "dinov2"),
-    "v3": Variant("v3", "Mask crop + CLIP", "mask", "clip"),
+    "v0": Variant("v0", "Whole frame + DINOv2", "whole"),
+    "v2": Variant("v2", "YOLO + SAM mask + DINOv2", "mask"),
 }
 
 
@@ -33,18 +29,27 @@ def preprocess_variant(
     localization: Localization,
     settings: Settings,
 ) -> np.ndarray | None:
-    height, width = image_rgb.shape[:2]
     if variant.crop == "whole":
         crop = image_rgb
-    elif variant.crop == "hand":
-        if localization.hand is None:
-            return None
-        box = hand_crop_box(
-            localization.hand.landmarks_px, width, height, settings.prompt_box_expand
-        )
-        crop = crop_box(image_rgb, box, margin_ratio=0.0)
     else:
         if localization.mask is None:
             return None
         crop = crop_mask(image_rgb, localization.mask, margin_ratio=0.10)
     return letterbox(crop, settings.input_size)
+
+
+def embedding_preprocess_version(variant: Variant, settings: Settings) -> str:
+    if variant.crop == "whole":
+        return PREPROCESS_VERSION
+    return (
+        f"{PREPROCESS_VERSION}+yolo-sam-v1:{settings.yolo_det_model_id}"
+        f":conf{settings.yolo_conf}:iou{settings.yolo_iou}:sz{settings.yolo_imgsz}"
+        f":allow{settings.yolo_allowed_classes}:reject{settings.yolo_reject_classes}"
+        f":area{settings.yolo_min_area_ratio}-{settings.yolo_max_area_ratio}"
+        f":center{settings.yolo_center_weight}"
+        f":sam2{settings.sam2_model_id}"
+        f":pred{settings.yolo_sam_min_pred_iou}"
+        f":box{settings.yolo_sam_min_box_iou}"
+        f":cover{settings.yolo_sam_min_box_coverage}"
+        f":border{settings.yolo_sam_max_border_fraction}"
+    )

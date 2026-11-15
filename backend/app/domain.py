@@ -26,10 +26,8 @@ class Capture:
     sha256: str
     width: int
     height: int
-    hand_found: bool
     mask_found: bool
     mask_status: str
-    localization: dict
     created_at: str
 
 

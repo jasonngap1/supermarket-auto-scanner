@@ -13,7 +13,6 @@ def sample(true_id, top_ids, status="ok", scores=None):
         top=[TopItem(i, f"item-{i}", 100, s) for i, s in zip(top_ids, scores)],
         status=status,
         timings_ms={"embed": 10.0, "match": 1.0, "total": 11.0},
-        hand_found=status != "no_hand",
     )
 
 
@@ -28,7 +27,7 @@ def test_compute_metrics_micro_macro_and_failures():
         sample(1, [1, 2]),
         sample(1, [2, 1]),
         sample(2, [3, 2]),
-        sample(3, [], status="no_hand"),
+        sample(3, [], status="no_detection"),
     ]
     metrics = compute_metrics(samples, n_items=3)
     assert metrics["n"] == 4
@@ -37,7 +36,6 @@ def test_compute_metrics_micro_macro_and_failures():
     assert metrics["top5"] == pytest.approx(0.75)
     assert metrics["macro_top1"] == pytest.approx((0.5 + 0.0 + 0.0) / 3)
     assert metrics["k_effective"] == 3
-    assert metrics["hand_found_rate"] == pytest.approx(0.75)
     assert metrics["mask_accepted_rate"] == pytest.approx(0.75)
     assert metrics["per_item"]["item-1"]["top1"] == pytest.approx(0.5)
     assert metrics["confusion"]["item-2"]["item-3"] == 1

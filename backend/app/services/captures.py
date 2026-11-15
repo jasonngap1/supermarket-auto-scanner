@@ -1,4 +1,3 @@
-import json
 import sqlite3
 from dataclasses import dataclass, fields
 from datetime import datetime, timezone
@@ -8,13 +7,11 @@ import numpy as np
 from app.config import Settings
 from app.db import db
 from app.domain import Capture, Role
-from app.errors import DuplicateCapture, ImageTooLarge, InvalidImage, ModelUnavailable
+from app.errors import DuplicateCapture, ImageTooLarge, InvalidImage
 from app.matching.vector_index import normalize
-from app.pipeline.types import HandObservation, Localization, MaskSelection, PromptSpec
 from app.services.storage import (
     CaptureArtifacts,
     decode_image,
-    load_mask,
     resolve_media_path,
     save_capture_bundle,
     sha256_hex,
@@ -27,9 +24,7 @@ def _now() -> str:
 
 def _row_to_capture(row: sqlite3.Row) -> Capture:
     data = dict(row)
-    data["hand_found"] = bool(data["hand_found"])
     data["mask_found"] = bool(data["mask_found"])
-    data["localization"] = json.loads(data.pop("localization_json"))
     allowed = {field.name for field in fields(Capture)}
     return Capture(**{key: value for key, value in data.items() if key in allowed})
 
@@ -44,10 +39,6 @@ def add_capture(
     sha256: str,
     width: int,
     height: int,
-    hand_found: bool,
-    mask_found: bool,
-    mask_status: str,
-    localization: dict,
 ) -> Capture:
     try:
         with db(settings) as connection:
@@ -55,15 +46,14 @@ def add_capture(
                 """
                 INSERT INTO captures (
                   item_id, role, session_id, rel_path, thumb_rel_path, mask_rel_path,
-                  sha256, width, height, hand_found, mask_found, mask_status,
+                  sha256, width, height, mask_found, mask_status,
                   localization_json, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     item_id, role, session_id, artifacts.rel_path,
                     artifacts.thumb_rel_path, artifacts.mask_rel_path, sha256,
-                    width, height, int(hand_found), int(mask_found), mask_status,
-                    json.dumps(localization), _now(),
+                    width, height, 0, "not_localized", "{}", _now(),
                 ),
             )
             capture_id = int(cursor.lastrowid)
@@ -114,9 +104,6 @@ class EvalCapture:
     item_name: str
     item_price_cents: int
     rel_path: str
-    mask_rel_path: str
-    mask_found: bool
-    localization: dict
 
 
 def list_test_captures(settings: Settings, item_ids: list[int] | None = None) -> list[EvalCapture]:
@@ -136,8 +123,6 @@ def list_test_captures(settings: Settings, item_ids: list[int] | None = None) ->
         EvalCapture(
             id=row["id"], item_id=row["item_id"], item_name=row["item_name"],
             item_price_cents=row["item_price_cents"], rel_path=row["rel_path"],
-            mask_rel_path=row["mask_rel_path"], mask_found=bool(row["mask_found"]),
-            localization=json.loads(row["localization_json"]),
         )
         for row in rows
     ]
@@ -145,6 +130,8 @@ def list_test_captures(settings: Settings, item_ids: list[int] | None = None) ->
 
 def remove_capture_files(settings: Settings, capture: Capture) -> None:
     for rel_path in (capture.rel_path, capture.thumb_rel_path, capture.mask_rel_path):
+        if not rel_path:
+            continue
         try:
             resolve_media_path(settings, rel_path).unlink(missing_ok=True)
         except (OSError, ValueError):
@@ -209,63 +196,6 @@ def get_embedding(
     return np.frombuffer(row["vector"], dtype=np.float32).copy()
 
 
-def localization_to_dict(localization: Localization) -> dict:
-    selected = localization.selection.selected
-    return {
-        "hand": None if localization.hand is None else {
-            "landmarks_px": localization.hand.landmarks_px,
-            "bbox": localization.hand.bbox,
-            "score": localization.hand.score,
-        },
-        "prompt": None if localization.prompt is None else {
-            "positive_points": localization.prompt.positive_points,
-            "negative_points": localization.prompt.negative_points,
-            "box": localization.prompt.box,
-            "mode": localization.prompt.mode,
-            "text": localization.prompt.text,
-        },
-        "selection": {
-            "selected_index": None if selected is None else selected.index,
-            "reasons": localization.selection.reasons,
-            "scores": localization.selection.scores,
-            "area_ratios": localization.selection.area_ratios,
-        },
-        "status": localization.status,
-        "timings_ms": localization.timings_ms,
-    }
-
-
-def load_capture_localization(settings: Settings, capture) -> Localization:
-    data = capture.localization
-    hand_data = data.get("hand")
-    hand = None
-    if hand_data:
-        hand = HandObservation(
-            landmarks_px=[tuple(point) for point in hand_data["landmarks_px"]],
-            bbox=tuple(hand_data["bbox"]),
-            score=float(hand_data["score"]),
-        )
-    prompt_data = data.get("prompt")
-    prompt = None
-    if prompt_data:
-        prompt = PromptSpec(
-            positive_points=[tuple(p) for p in prompt_data["positive_points"]],
-            negative_points=[tuple(p) for p in prompt_data["negative_points"]],
-            box=None if prompt_data["box"] is None else tuple(prompt_data["box"]),
-            mode=prompt_data["mode"],
-            text=prompt_data.get("text"),
-        )
-    mask = load_mask(settings, capture.mask_rel_path) if capture.mask_found else None
-    return Localization(
-        hand=hand,
-        prompt=prompt,
-        selection=MaskSelection(None, data.get("selection", {}).get("reasons", []), [], []),
-        mask=mask,
-        status=data.get("status", "ok"),
-        timings_ms=data.get("timings_ms", {}),
-    )
-
-
 def capture_duplicate_exists(settings: Settings, item_id: int, role: str, sha256: str) -> bool:
     with db(settings) as connection:
         row = connection.execute(
@@ -288,9 +218,8 @@ NEAR_DUPLICATE_THRESHOLD = 0.995
 
 
 class CaptureService:
-    def __init__(self, settings, pipeline, embeddings=None):
+    def __init__(self, settings, embeddings=None):
         self.settings = settings
-        self.pipeline = pipeline
         self.embeddings = embeddings
 
     def _near_duplicate_score(self, capture: Capture, role: str) -> float | None:
@@ -302,14 +231,14 @@ class CaptureService:
         if self.embeddings is None:
             return None
         try:
-            vector = self.embeddings.get_capture_vector(capture, "v2")
+            vector = self.embeddings.get_capture_vector(capture, "v0")
             if vector is None:
                 return None
             query = normalize(vector)
             other_role = "test" if role == "gallery" else "gallery"
             best = 0.0
             for other in list_captures(self.settings, capture.item_id, other_role):
-                other_vector = self.embeddings.get_capture_vector(other, "v2")
+                other_vector = self.embeddings.get_capture_vector(other, "v0")
                 if other_vector is not None:
                     best = max(best, float(query @ normalize(other_vector)))
             return best
@@ -326,14 +255,7 @@ class CaptureService:
         if capture_duplicate_exists(self.settings, item_id, role, digest):
             return CaptureUploadResult(False, reason="duplicate")
 
-        try:
-            localization = self.pipeline.localize(image)
-        except ModelUnavailable:
-            return CaptureUploadResult(False, reason="model_error")
-        if localization.status != "ok" or localization.mask is None:
-            return CaptureUploadResult(False, reason=localization.status)
-
-        artifacts = save_capture_bundle(self.settings, item_id, image, localization.mask)
+        artifacts = save_capture_bundle(self.settings, item_id, image)
         try:
             capture = add_capture(
                 self.settings,
@@ -344,10 +266,6 @@ class CaptureService:
                 sha256=digest,
                 width=width,
                 height=height,
-                hand_found=localization.hand is not None,
-                mask_found=localization.mask is not None,
-                mask_status=localization.status,
-                localization=localization_to_dict(localization),
             )
         except DuplicateCapture:
             return CaptureUploadResult(False, reason="duplicate")

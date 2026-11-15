@@ -23,5 +23,4 @@ def test_health_endpoint(tmp_path):
     body = response.json()
     assert body["status"] == "ok"
     assert body["device"]["preference"] == "auto"
-    assert body["assets"]["hand_landmarker"] is False
-    assert "dinov2" in body["models"]
+    assert set(body["models"]) == {"dinov2", "sam2", "yolo"}

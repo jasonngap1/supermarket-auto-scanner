@@ -13,7 +13,7 @@ function renderVariants() {
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
     checkbox.value = variant.id;
-    checkbox.checked = variant.id !== "v3";
+    checkbox.checked = true;
     if (checkbox.checked) selected.add(variant.id);
     checkbox.addEventListener("change", () => {
       if (checkbox.checked) selected.add(variant.id);
@@ -116,7 +116,7 @@ function renderMetrics(run) {
     const dataNote = document.createElement("p");
     dataNote.className = "muted";
     dataNote.textContent =
-      `Items: ${first.n_items} · Hand found: ${(first.hand_found_rate * 100).toFixed(0)}% · ` +
+      `Items: ${first.n_items} · ` +
       `Mask accepted: ${(first.mask_accepted_rate * 100).toFixed(0)}% · ` +
       `Near-duplicate test images: ${first.near_duplicate_count}` +
       (first.n_items < 5 ? " — insufficient data: fewer than 5 items, top-5 is not meaningful." : "");

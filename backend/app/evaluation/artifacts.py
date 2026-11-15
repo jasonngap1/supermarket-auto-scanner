@@ -6,8 +6,13 @@ from app.services.storage import resolve_media_path
 
 
 def save_failure_artifact(
-    settings, run_id: str, key: str, image_rgb, localization,
-    true_name: str, predicted: TopItem | None,
+    settings,
+    run_id: str,
+    key: str,
+    image_rgb,
+    true_name: str,
+    predicted: TopItem | None,
+    localization=None,
 ) -> str:
     label = f"true: {true_name} | pred: {predicted.name if predicted else 'none'}"
     jpeg = annotate_frame(

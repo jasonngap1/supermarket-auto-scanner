@@ -15,7 +15,6 @@ class SampleResult:
     top: list[TopItem]
     status: str
     timings_ms: dict[str, float]
-    hand_found: bool = True
 
 
 def wilson_ci(successes: int, n: int, z: float = 1.96) -> tuple[float, float]:
@@ -81,11 +80,10 @@ def compute_metrics(samples: list[SampleResult], n_items: int) -> dict:
         }
         for stage in stages
     }
-    hand_found_rate = sum(1 for sample in samples if sample.hand_found) / n if n else 0.0
     mask_accepted_rate = (
         sum(
             1 for sample in samples
-            if sample.status not in {"no_hand", "mask_rejected"}
+            if sample.status not in {"no_detection", "mask_rejected", "model_error"}
         ) / n if n else 0.0
     )
 
@@ -97,7 +95,6 @@ def compute_metrics(samples: list[SampleResult], n_items: int) -> dict:
         "macro_top1": macro,
         "top1_ci": wilson_ci(total1, n),
         "k_effective": min(5, n_items),
-        "hand_found_rate": hand_found_rate,
         "mask_accepted_rate": mask_accepted_rate,
         "per_item": per_item_out,
         "confusion": {k: dict(v) for k, v in confusion.items()},

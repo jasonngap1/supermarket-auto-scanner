@@ -25,7 +25,6 @@ class CaptureOut(BaseModel):
     mask_rel_path: str
     width: int
     height: int
-    hand_found: bool
     mask_found: bool
     mask_status: str
 
@@ -66,7 +65,6 @@ class VariantOut(BaseModel):
 class AnalyzeOut(BaseModel):
     frame_id: str
     annotated_jpeg_b64: str
-    hand_found: bool
     mask_found: bool
     mask_status: str
     variants: list[VariantOut]

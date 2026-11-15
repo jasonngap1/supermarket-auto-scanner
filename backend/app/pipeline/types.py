@@ -4,25 +4,9 @@ import numpy as np
 
 
 @dataclass(frozen=True)
-class HandObservation:
-    landmarks_px: list[tuple[float, float]]
-    bbox: tuple[float, float, float, float]
-    score: float
-
-
-@dataclass(frozen=True)
-class FaceObservation:
-    bbox: tuple[float, float, float, float]
-    score: float
-
-
-@dataclass(frozen=True)
 class PromptSpec:
-    positive_points: list[tuple[float, float]]
-    negative_points: list[tuple[float, float]]
-    box: tuple[float, float, float, float] | None
-    mode: str
-    text: str | None = None
+    positive_points: list[tuple[float, float]] = field(default_factory=list)
+    box: tuple[float, float, float, float] | None = None
 
 
 @dataclass(frozen=True)
@@ -41,11 +25,29 @@ class MaskSelection:
 
 
 @dataclass(frozen=True)
+class Detection:
+    index: int
+    class_id: int
+    class_name: str
+    confidence: float
+    bbox: tuple[float, float, float, float]
+
+
+@dataclass(frozen=True)
+class DetectionSelection:
+    selected: Detection | None
+    reasons: list[str]
+    scores: list[float]
+    area_ratios: list[float]
+
+
+@dataclass(frozen=True)
 class Localization:
-    hand: HandObservation | None
-    prompt: PromptSpec | None
-    selection: MaskSelection
-    mask: np.ndarray | None
-    status: str  # ok | no_hand | mask_rejected | model_error
+    status: str = "ok"  # ok | no_detection | mask_rejected | model_error
+    mask: np.ndarray | None = None
+    bbox: tuple[float, float, float, float] | None = None
+    prompt: PromptSpec | None = None
+    mask_selection: MaskSelection | None = None
+    detections: list[Detection] = field(default_factory=list)
+    detection_selection: DetectionSelection | None = None
     timings_ms: dict[str, float] = field(default_factory=dict)
-    face: FaceObservation | None = None

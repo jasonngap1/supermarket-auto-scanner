@@ -13,7 +13,7 @@ router = APIRouter()
 @router.post("/analyze", response_model=AnalyzeOut)
 async def analyze(
     image: UploadFile = File(...),
-    variants: str = Form("v0,v1,v2"),
+    variants: str = Form("v0,v2"),
     state=Depends(get_state),
 ):
     if state.analysis is None:
@@ -39,7 +39,6 @@ async def analyze(
     return AnalyzeOut(
         frame_id=result.frame_id,
         annotated_jpeg_b64=base64.b64encode(result.annotated_jpeg).decode(),
-        hand_found=result.hand_found,
         mask_found=result.mask_found,
         mask_status=result.mask_status,
         variants=[

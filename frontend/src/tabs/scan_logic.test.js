@@ -10,75 +10,34 @@ describe("scan logic", () => {
     expect(best.name).toBe("Bread");
   });
 
-  it("asks for a centred item when the mask is missing", () => {
+  it("asks for a centred item when detection or the mask fails", () => {
     expect(
-      statusMessage({
-        hand_found: false,
-        mask_found: false,
-        variants: [{ variant: "v2", status: "mask_rejected" }],
-      }),
+      statusMessage({ variants: [{ variant: "v2", status: "mask_rejected" }] }),
     ).toMatch(/centre/);
     expect(
-      statusMessage({
-        hand_found: true,
-        mask_found: true,
-        variants: [{ variant: "v2", status: "ok" }],
-      }),
+      statusMessage({ variants: [{ variant: "v2", status: "no_detection" }] }),
+    ).toMatch(/centre/);
+    expect(
+      statusMessage({ variants: [{ variant: "v2", status: "ok" }] }),
     ).toBe("OK");
   });
 
-  it("does not demand a hand for mask variants", () => {
-    const body = {
-      hand_found: false,
-      mask_found: true,
-      variants: [
-        { variant: "v0", status: "ok" },
-        { variant: "v2", status: "ok" },
-      ],
-    };
-    expect(statusMessage(body)).toBe("OK");
-    expect(isErrorStatus(body)).toBe(false);
-  });
-
   it("does not demand a mask when only V0 is selected", () => {
-    const body = {
-      hand_found: false,
-      mask_found: false,
-      variants: [{ variant: "v0", status: "ok" }],
-    };
+    const body = { variants: [{ variant: "v0", status: "ok" }] };
     expect(statusMessage(body)).toBe("OK");
     expect(isErrorStatus(body)).toBe(false);
   });
 
-  it("flags a no-hand result when the hand-crop variant is selected", () => {
-    const body = {
-      hand_found: false,
-      mask_found: true,
-      variants: [
-        { variant: "v0", status: "ok" },
-        { variant: "v1", status: "no_hand" },
-      ],
-    };
-    expect(statusMessage(body)).toMatch(/No hand/);
+  it("flags a model failure", () => {
+    const body = { variants: [{ variant: "v2", status: "model_error" }] };
+    expect(statusMessage(body)).toMatch(/Models unavailable/);
     expect(isErrorStatus(body)).toBe(true);
   });
 
-  it("flags a rejected mask as an error", () => {
+  it("treats an accepted mask as success", () => {
     const body = {
-      hand_found: true,
-      mask_found: false,
-      variants: [{ variant: "v2", status: "mask_rejected" }],
-    };
-    expect(isErrorStatus(body)).toBe(true);
-  });
-
-  it("ignores the hand control failing when the mask pipeline works", () => {
-    const body = {
-      hand_found: false,
-      mask_found: true,
       variants: [
         { variant: "v0", status: "ok" },
-        { variant: "v1", status: "no_hand" },
         { variant: "v2", status: "ok" },
       ],
     };
