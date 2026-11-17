@@ -3,10 +3,9 @@ from types import SimpleNamespace
 import numpy as np
 
 from app.config import Settings
-from app.pipeline.types import Detection
 from app.services import embeddings as embeddings_module
 from app.services.embeddings import EmbeddingService
-from tests.fakes import FakeRegistry
+from tests.fakes import FakeRegistry, detection
 
 
 def service_and_cache(tmp_path, monkeypatch, registry):
@@ -32,9 +31,7 @@ def service_and_cache(tmp_path, monkeypatch, registry):
 
 
 def test_v2_detects_once_and_reuses_cache(tmp_path, monkeypatch):
-    registry = FakeRegistry(
-        detections=[Detection(0, 46, "banana", 0.9, (20, 20, 80, 80))]
-    )
+    registry = FakeRegistry(detections=[detection()])
     service, versions = service_and_cache(tmp_path, monkeypatch, registry)
     capture = SimpleNamespace(id=1, rel_path="image.jpg")
 
@@ -46,13 +43,12 @@ def test_v2_detects_once_and_reuses_cache(tmp_path, monkeypatch):
     assert np.array_equal(first.vector, second.vector)
     assert registry.detect_calls == 1
     assert versions[0] == versions[1]
-    assert "yolo-sam-v1" in versions[0]
+    assert "yolo-seg-v1" in versions[0]
+    assert "mask-norm-v1" in versions[0]
 
 
 def test_v0_uses_a_different_cache_version_and_no_detection(tmp_path, monkeypatch):
-    registry = FakeRegistry(
-        detections=[Detection(0, 46, "banana", 0.9, (20, 20, 80, 80))]
-    )
+    registry = FakeRegistry(detections=[detection()])
     service, versions = service_and_cache(tmp_path, monkeypatch, registry)
     capture = SimpleNamespace(id=1, rel_path="image.jpg")
 

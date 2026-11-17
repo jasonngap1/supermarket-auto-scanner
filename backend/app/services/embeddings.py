@@ -12,7 +12,7 @@ from app.pipeline.variants import (
     embedding_preprocess_version,
     preprocess_variant,
 )
-from app.pipeline.yolo import localize_with_yolo_sam
+from app.pipeline.yolo import localize_with_yolo_seg
 from app.services.captures import (
     get_embedding,
     list_gallery_captures,
@@ -49,7 +49,7 @@ class EmbeddingService:
         timings: dict[str, float] = {}
         if variant.crop == "mask":
             try:
-                localization = localize_with_yolo_sam(
+                localization = localize_with_yolo_seg(
                     self.settings, self.registry, image
                 )
             except ModelUnavailable:

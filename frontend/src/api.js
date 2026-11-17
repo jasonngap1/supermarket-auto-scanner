@@ -23,6 +23,13 @@ export const createItem = (name, priceCents) =>
     body: JSON.stringify({ name, price_cents: priceCents }),
   });
 
+export const updateItem = (itemId, payload) =>
+  jsonFetch(`/api/items/${itemId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
 export const deleteItem = (itemId) =>
   fetch(`/api/items/${itemId}`, { method: "DELETE" });
 

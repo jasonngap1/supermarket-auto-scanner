@@ -13,8 +13,8 @@ const milk = { item_id: 1, name: "Milk", price_cents: 199, score: 0.9 };
 const bread = { item_id: 2, name: "Bread", price_cents: 250, score: 0.9 };
 
 describe("scan gate", () => {
-  it("uses 0.60 as the add threshold", () => {
-    expect(ADD_SCORE).toBe(0.6);
+  it("uses 0.70 as the add threshold", () => {
+    expect(ADD_SCORE).toBe(0.7);
   });
 
   it("adds an item at the add threshold and locks", () => {

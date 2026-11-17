@@ -47,7 +47,8 @@
         <form id="item-form" class="row">
           <input id="item-name" placeholder="Item name" required maxlength="120" />
           <input id="item-price" type="number" min="0" step="0.01" placeholder="Price" required />
-          <button type="submit">Add item</button>
+          <button id="item-submit" type="submit">Add item</button>
+          <button id="item-cancel" type="button" hidden>Cancel</button>
         </form>
         <div id="item-list" class="list"></div>
         <div id="enroll-panel" hidden>

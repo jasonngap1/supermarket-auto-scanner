@@ -84,6 +84,24 @@
       "name": "candy",
       "price_cents": 1000,
       "created_at": "2026-11-16T08:21:29+00:00"
+    },
+    {
+      "id": 29,
+      "name": "water bottle",
+      "price_cents": 1000,
+      "created_at": "2026-11-17T11:30:23+00:00"
+    },
+    {
+      "id": 30,
+      "name": "tongue cleaner",
+      "price_cents": 200,
+      "created_at": "2026-11-17T11:30:55+00:00"
+    },
+    {
+      "id": 31,
+      "name": "pomade",
+      "price_cents": 1500,
+      "created_at": "2026-11-17T11:31:56+00:00"
     }
   ],
   "captures": [
@@ -477,6 +495,108 @@
       "mask_status": "ok",
       "localization_json": "{}",
       "created_at": "2026-11-16T08:21:57+00:00"
+    },
+    {
+      "id": 50,
+      "item_id": 29,
+      "role": "gallery",
+      "session_id": "3487f240",
+      "rel_path": "images/29/6b1895c7a2144576a86ecf1cdba04535.jpg",
+      "thumb_rel_path": "thumbs/6b1895c7a2144576a86ecf1cdba04535.jpg",
+      "mask_rel_path": "masks/6b1895c7a2144576a86ecf1cdba04535.png",
+      "sha256": "ae0571032cca4fb61c0d3c55380d356085c3340015872bac9a13f1c9497db21c",
+      "width": 1280,
+      "height": 720,
+      "hand_found": 0,
+      "mask_found": 1,
+      "mask_status": "ok",
+      "localization_json": "{}",
+      "created_at": "2026-11-17T11:30:36+00:00"
+    },
+    {
+      "id": 51,
+      "item_id": 29,
+      "role": "gallery",
+      "session_id": "3487f240",
+      "rel_path": "images/29/a584792e9e154b63b084ce373f731a7f.jpg",
+      "thumb_rel_path": "thumbs/a584792e9e154b63b084ce373f731a7f.jpg",
+      "mask_rel_path": "masks/a584792e9e154b63b084ce373f731a7f.png",
+      "sha256": "9e86a717955cd31063716e9044d9e434c26f844abfa101cf1a3d8799f5dab4b4",
+      "width": 1280,
+      "height": 720,
+      "hand_found": 0,
+      "mask_found": 1,
+      "mask_status": "ok",
+      "localization_json": "{}",
+      "created_at": "2026-11-17T11:30:42+00:00"
+    },
+    {
+      "id": 52,
+      "item_id": 30,
+      "role": "gallery",
+      "session_id": "3487f240",
+      "rel_path": "images/30/ad7b3fe3b5844eeb895a72ca16ed9850.jpg",
+      "thumb_rel_path": "thumbs/ad7b3fe3b5844eeb895a72ca16ed9850.jpg",
+      "mask_rel_path": "masks/ad7b3fe3b5844eeb895a72ca16ed9850.png",
+      "sha256": "9811a2a7689c1eaab7d721e425c1075cd764f186f4949a8f9139aa8d7ae88b0a",
+      "width": 1280,
+      "height": 720,
+      "hand_found": 0,
+      "mask_found": 1,
+      "mask_status": "ok",
+      "localization_json": "{}",
+      "created_at": "2026-11-17T11:31:13+00:00"
+    },
+    {
+      "id": 53,
+      "item_id": 30,
+      "role": "gallery",
+      "session_id": "3487f240",
+      "rel_path": "images/30/9eea13e5dc55404aaca750085e480be5.jpg",
+      "thumb_rel_path": "thumbs/9eea13e5dc55404aaca750085e480be5.jpg",
+      "mask_rel_path": "masks/9eea13e5dc55404aaca750085e480be5.png",
+      "sha256": "0d34b8e3e1e0c147d7f6fb9cf6cd64975ce75667c44add19b69f29105e7f6544",
+      "width": 1280,
+      "height": 720,
+      "hand_found": 0,
+      "mask_found": 1,
+      "mask_status": "ok",
+      "localization_json": "{}",
+      "created_at": "2026-11-17T11:31:19+00:00"
+    },
+    {
+      "id": 54,
+      "item_id": 31,
+      "role": "gallery",
+      "session_id": "3487f240",
+      "rel_path": "images/31/3ffa104bc9304f51b85eab4d2fe8d9da.jpg",
+      "thumb_rel_path": "thumbs/3ffa104bc9304f51b85eab4d2fe8d9da.jpg",
+      "mask_rel_path": "masks/3ffa104bc9304f51b85eab4d2fe8d9da.png",
+      "sha256": "0f37a2cba240c6a88d861d996daff203829c5dad1aabf2a3376e51529f5e477a",
+      "width": 1280,
+      "height": 720,
+      "hand_found": 0,
+      "mask_found": 1,
+      "mask_status": "ok",
+      "localization_json": "{}",
+      "created_at": "2026-11-17T11:32:05+00:00"
+    },
+    {
+      "id": 55,
+      "item_id": 31,
+      "role": "gallery",
+      "session_id": "3487f240",
+      "rel_path": "images/31/a4441718f7dc4362a94d24ca7db3ecc1.jpg",
+      "thumb_rel_path": "thumbs/a4441718f7dc4362a94d24ca7db3ecc1.jpg",
+      "mask_rel_path": "masks/a4441718f7dc4362a94d24ca7db3ecc1.png",
+      "sha256": "93ce7b1fa93813818784905a7908a1551a354443dbfac34fb63670cdbbe5e415",
+      "width": 1280,
+      "height": 720,
+      "hand_found": 0,
+      "mask_found": 1,
+      "mask_status": "ok",
+      "localization_json": "{}",
+      "created_at": "2026-11-17T11:32:09+00:00"
     }
   ]
 }

@@ -2,11 +2,16 @@ import time
 from pathlib import Path
 
 import numpy as np
+from PIL import Image
 
 from app.errors import ModelUnavailable
 from app.pipeline.mask_select import select_box_mask, select_detection
-from app.pipeline.prompts import build_box_prompt
-from app.pipeline.types import Detection, Localization
+from app.pipeline.types import (
+    Detection,
+    DetectionSelection,
+    Localization,
+    MaskCandidate,
+)
 
 
 def parse_class_ids(spec: str, names: dict[int, str]) -> list[int] | None:
@@ -29,6 +34,37 @@ def parse_class_ids(spec: str, names: dict[int, str]) -> list[int] | None:
         if class_id not in ids:
             ids.append(class_id)
     return ids or None
+
+
+def masks_from_result(
+    result, count: int, frame_shape: tuple[int, int] | None = None
+) -> list[np.ndarray | None]:
+    """Convert ultralytics masks to boolean arrays at the frame size.
+
+    Ultralytics returns uint8 masks. Boolean indexing elsewhere expects real
+    booleans, so the conversion happens here. Any shape or count mismatch drops
+    the masks rather than indexing the wrong detection.
+    """
+    masks = getattr(result, "masks", None)
+    if masks is None:
+        return [None] * count
+
+    data = masks.data
+    array = data.cpu().numpy() if hasattr(data, "cpu") else np.asarray(data)
+    if array.ndim == 2:
+        array = array[None, ...]
+    if array.shape[0] != count:
+        return [None] * count
+
+    converted: list[np.ndarray | None] = []
+    for row in array:
+        mask = row.astype(bool)
+        if frame_shape is not None and mask.shape != frame_shape:
+            resized = Image.fromarray(mask.astype(np.uint8))
+            resized = resized.resize((frame_shape[1], frame_shape[0]), Image.NEAREST)
+            mask = np.asarray(resized, dtype=bool)
+        converted.append(mask)
+    return converted
 
 
 class YoloDetector:
@@ -56,13 +92,27 @@ class YoloDetector:
         else:
             source = model_id
 
+        is_onnx = source.lower().endswith(".onnx")
+        if is_onnx:
+            try:
+                import onnxruntime  # noqa: F401
+            except ImportError as exc:
+                raise ModelUnavailable(
+                    "ONNX Runtime is unavailable; run: uv sync"
+                ) from exc
+
         self.model_id = model_id
-        self.device = device
+        # ONNX Runtime on MPS is not validated here; the detector stays on CPU.
+        self.device = "cpu" if is_onnx else device
         self.conf = conf
         self.iou = iou
         self.imgsz = imgsz
         self.allowed_classes = allowed_classes
         self._model = YOLO(source)
+        if getattr(self._model, "task", None) != "segment":
+            raise ModelUnavailable(
+                f"YOLO model {model_id} is not a segmentation model"
+            )
         self._class_ids = parse_class_ids(allowed_classes, self._model.names)
 
     def predict(self, image_rgb: np.ndarray) -> list[Detection]:
@@ -74,6 +124,7 @@ class YoloDetector:
             imgsz=self.imgsz,
             device=self.device,
             classes=self._class_ids,
+            retina_masks=True,
             verbose=False,
         )
         if not results:
@@ -86,6 +137,7 @@ class YoloDetector:
         xyxy = boxes.xyxy.cpu().numpy()
         confidences = boxes.conf.cpu().numpy()
         classes = boxes.cls.cpu().numpy().astype(int)
+        masks = masks_from_result(result, len(xyxy), image_rgb.shape[:2])
         return [
             Detection(
                 index=index,
@@ -93,26 +145,27 @@ class YoloDetector:
                 class_name=str(names.get(int(class_id), class_id)),
                 confidence=float(confidence),
                 bbox=tuple(float(value) for value in box[:4]),
+                mask=mask,
             )
-            for index, (box, confidence, class_id) in enumerate(
-                zip(xyxy, confidences, classes)
+            for index, (box, confidence, class_id, mask) in enumerate(
+                zip(xyxy, confidences, classes, masks)
             )
         ]
 
 
-def localize_with_yolo_sam(settings, registry, image_rgb: np.ndarray) -> Localization:
-    timings: dict[str, float] = {}
-
+def detect_and_select(
+    settings, registry, image_rgb: np.ndarray
+) -> tuple[list[Detection], DetectionSelection, float]:
     start = time.perf_counter()
     detections = registry.detect_objects(image_rgb)
-    timings["yolo"] = (time.perf_counter() - start) * 1000
+    elapsed_ms = (time.perf_counter() - start) * 1000
 
     reject_classes = frozenset(
         token.strip().lower()
         for token in settings.yolo_reject_classes.split(",")
         if token.strip()
     )
-    detection_selection = select_detection(
+    selection = select_detection(
         detections,
         image_rgb.shape[1],
         image_rgb.shape[0],
@@ -122,6 +175,15 @@ def localize_with_yolo_sam(settings, registry, image_rgb: np.ndarray) -> Localiz
         center_weight=settings.yolo_center_weight,
         min_confidence=settings.yolo_conf,
     )
+    return detections, selection, elapsed_ms
+
+
+def localize_with_yolo_seg(settings, registry, image_rgb: np.ndarray) -> Localization:
+    """Production chain: one YOLO26n-seg pass supplies the box and the mask."""
+    detections, detection_selection, yolo_ms = detect_and_select(
+        settings, registry, image_rgb
+    )
+    timings = {"yolo": yolo_ms}
     selected = detection_selection.selected
     if selected is None:
         return Localization(
@@ -131,39 +193,32 @@ def localize_with_yolo_sam(settings, registry, image_rgb: np.ndarray) -> Localiz
             timings_ms=timings,
         )
 
-    prompt = build_box_prompt(
-        selected.bbox, image_rgb.shape[1], image_rgb.shape[0]
-    )
-    if prompt.box is None:
+    if selected.mask is None:
         return Localization(
-            status="no_detection",
+            status="mask_rejected",
+            bbox=selected.bbox,
             detections=detections,
             detection_selection=detection_selection,
             timings_ms=timings,
         )
 
-    start = time.perf_counter()
-    candidates = registry.segment(image_rgb, prompt)
-    timings["sam2"] = (time.perf_counter() - start) * 1000
-
     mask_selection = select_box_mask(
-        candidates,
-        prompt.box,
+        [MaskCandidate(0, selected.mask, 1.0)],
+        selected.bbox,
         image_rgb.shape[1],
         image_rgb.shape[0],
         min_area_ratio=settings.yolo_min_area_ratio,
         max_area_ratio=settings.yolo_max_area_ratio,
-        min_pred_iou=settings.yolo_sam_min_pred_iou,
-        min_box_iou=settings.yolo_sam_min_box_iou,
-        min_box_coverage=settings.yolo_sam_min_box_coverage,
-        max_border_fraction=settings.yolo_sam_max_border_fraction,
+        min_pred_iou=0.0,
+        min_box_iou=settings.mask_min_box_iou,
+        min_box_coverage=settings.mask_min_box_coverage,
+        max_border_fraction=settings.mask_max_border_fraction,
     )
     selected_mask = mask_selection.selected
     return Localization(
         status="ok" if selected_mask is not None else "mask_rejected",
         mask=selected_mask.mask if selected_mask is not None else None,
-        bbox=prompt.box,
-        prompt=prompt,
+        bbox=selected.bbox,
         mask_selection=mask_selection,
         detections=detections,
         detection_selection=detection_selection,

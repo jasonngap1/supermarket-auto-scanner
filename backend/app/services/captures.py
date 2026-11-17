@@ -8,6 +8,7 @@ from app.config import Settings
 from app.db import db
 from app.domain import Capture, Role
 from app.errors import DuplicateCapture, ImageTooLarge, InvalidImage, ModelUnavailable
+from app.pipeline.yolo import localize_with_yolo_seg
 from app.services.catalog import sync_catalog
 from app.services.storage import (
     CaptureArtifacts,
@@ -55,8 +56,7 @@ def add_capture(
                 (
                     item_id, role, session_id, artifacts.rel_path,
                     artifacts.thumb_rel_path, artifacts.mask_rel_path, sha256,
-                    width, height, int(mask_found), mask_status,
-                    "{}", _now(),
+                    width, height, int(mask_found), mask_status, "{}", _now(),
                 ),
             )
             capture_id = int(cursor.lastrowid)
@@ -98,6 +98,19 @@ def list_gallery_captures(settings: Settings):
             """
         ).fetchall()
     return [(_row_to_capture(row), row["name"], row["price_cents"]) for row in rows]
+
+
+def list_test_captures(settings: Settings):
+    """Return (capture, item_name) for all held-out test captures."""
+    with db(settings) as connection:
+        rows = connection.execute(
+            """
+            SELECT c.*, i.name FROM captures c
+            JOIN items i ON i.id = c.item_id
+            WHERE c.role = 'test' ORDER BY c.item_id, c.id
+            """
+        ).fetchall()
+    return [(_row_to_capture(row), row["name"]) for row in rows]
 
 
 def remove_capture_files(settings: Settings, capture: Capture) -> None:
@@ -184,10 +197,24 @@ class CaptureUploadResult:
     reason: str | None = None
 
 
+def remove_artifact_files(settings: Settings, artifacts: CaptureArtifacts) -> None:
+    for rel_path in (
+        artifacts.rel_path,
+        artifacts.thumb_rel_path,
+        artifacts.mask_rel_path,
+    ):
+        if not rel_path:
+            continue
+        try:
+            resolve_media_path(settings, rel_path).unlink(missing_ok=True)
+        except (OSError, ValueError):
+            pass
+
+
 class CaptureService:
-    def __init__(self, settings, pipeline):
+    def __init__(self, settings, registry):
         self.settings = settings
-        self.pipeline = pipeline
+        self.registry = registry
 
     def add(self, item_id: int, role: str, session_id: str, data: bytes) -> CaptureUploadResult:
         try:
@@ -199,10 +226,15 @@ class CaptureService:
         if capture_duplicate_exists(self.settings, item_id, role, digest):
             return CaptureUploadResult(False, reason="duplicate")
 
-        try:
-            localization = self.pipeline.localize(image)
-        except ModelUnavailable:
-            return CaptureUploadResult(False, reason="model_error")
+        # Enrollment stores only frames with both a YOLO bounding box and an
+        # accepted segmentation mask; reject before writing any file.
+        with self.registry.gate():
+            try:
+                localization = localize_with_yolo_seg(
+                    self.settings, self.registry, image
+                )
+            except ModelUnavailable:
+                return CaptureUploadResult(False, reason="model_error")
 
         if (
             localization.status != "ok"
@@ -233,6 +265,7 @@ class CaptureService:
                 mask_status="ok",
             )
         except DuplicateCapture:
+            remove_artifact_files(self.settings, artifacts)
             return CaptureUploadResult(False, reason="duplicate")
         sync_catalog(self.settings)
         return CaptureUploadResult(True, capture=capture)

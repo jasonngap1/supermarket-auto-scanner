@@ -5,7 +5,6 @@ from app.config import Settings
 from app.errors import ModelUnavailable
 from app.ml.devices import resolve_device
 from app.pipeline.embedders import DinoV2Embedder
-from app.pipeline.sam2 import Sam2Segmenter
 from app.pipeline.yolo import YoloDetector
 
 
@@ -15,7 +14,6 @@ class ModelRegistry:
         settings: Settings,
         *,
         dinov2_factory: Callable = DinoV2Embedder,
-        sam2_factory: Callable = Sam2Segmenter,
         yolo_factory: Callable = YoloDetector,
     ):
         self.settings = settings
@@ -24,15 +22,12 @@ class ModelRegistry:
         self._force_cpu: set[str] = set()
         self._factories = {
             "dinov2": dinov2_factory,
-            "sam2": sam2_factory,
             "yolo": yolo_factory,
         }
         self._embedder = None
-        self._sam2 = None
         self._yolo = None
         self._errors: dict[str, str | None] = {
             "dinov2": None,
-            "sam2": None,
             "yolo": None,
         }
 
@@ -55,24 +50,11 @@ class ModelRegistry:
                 raise ModelUnavailable(str(exc)) from exc
         return self._embedder
 
-    def _ensure_sam2(self):
-        if self._sam2 is None:
-            try:
-                self._sam2 = self._factories["sam2"](
-                    model_id=self.settings.sam2_model_id,
-                    device=self._device_for("sam2"),
-                )
-                self._errors["sam2"] = None
-            except Exception as exc:
-                self._errors["sam2"] = str(exc)
-                raise ModelUnavailable(str(exc)) from exc
-        return self._sam2
-
     def _ensure_yolo(self):
         if self._yolo is None:
             try:
                 self._yolo = self._factories["yolo"](
-                    model_id=self.settings.yolo_det_model_id,
+                    model_id=self.settings.yolo_seg_model_id,
                     device=self._device_for("yolo"),
                     conf=self.settings.yolo_conf,
                     iou=self.settings.yolo_iou,
@@ -88,7 +70,7 @@ class ModelRegistry:
 
     def warm(self) -> None:
         with self._gate:
-            for ensure in (self._ensure_embedder, self._ensure_sam2, self._ensure_yolo):
+            for ensure in (self._ensure_embedder, self._ensure_yolo):
                 try:
                     ensure()
                 except ModelUnavailable:
@@ -100,14 +82,6 @@ class ModelRegistry:
                 "dinov2",
                 lambda: self._ensure_embedder().embed(image),
                 reload=lambda: setattr(self, "_embedder", None),
-            )
-
-    def segment(self, image, prompt):
-        with self._gate:
-            return self._call_with_fallback(
-                "sam2",
-                lambda: self._ensure_sam2().segment(image, prompt),
-                reload=lambda: setattr(self, "_sam2", None),
             )
 
     def detect_objects(self, image):
@@ -143,17 +117,11 @@ class ModelRegistry:
                     "error": self._errors["dinov2"],
                     "model_id": self.settings.dinov2_model_id,
                 },
-                "sam2": {
-                    "loaded": self._sam2 is not None,
-                    "device": self._device_for("sam2"),
-                    "error": self._errors["sam2"],
-                    "model_id": self.settings.sam2_model_id,
-                },
                 "yolo": {
                     "loaded": self._yolo is not None,
-                    "device": self._device_for("yolo"),
+                    "device": getattr(self._yolo, "device", self._device_for("yolo")),
                     "error": self._errors["yolo"],
-                    "model_id": self.settings.yolo_det_model_id,
+                    "model_id": self.settings.yolo_seg_model_id,
                 },
             },
         }

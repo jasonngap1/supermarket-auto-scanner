@@ -5,14 +5,13 @@ from PIL import Image
 from app.domain import TopItem
 from app.pipeline.annotate import annotate_frame
 from app.pipeline.frame_pipeline import FramePipeline
-from app.pipeline.types import Detection
-from tests.fakes import FakeRegistry, image, make_settings
+from tests.fakes import FakeRegistry, detection, image, make_settings
 
 
 def test_annotate_returns_decodable_jpeg(tmp_path):
     settings = make_settings(tmp_path)
     pipeline = FramePipeline(
-        FakeRegistry(detections=[Detection(0, 46, "banana", 0.9, (20, 20, 80, 80))]),
+        FakeRegistry(detections=[detection()]),
         settings,
     )
     frame = image()

@@ -12,7 +12,7 @@ sys.path.insert(0, str(ROOT / "backend"))
 from app import bootstrap  # noqa: E402,F401
 from app.config import Settings  # noqa: E402
 from app.ml.registry import ModelRegistry  # noqa: E402
-from app.pipeline.yolo import localize_with_yolo_sam  # noqa: E402
+from app.pipeline.yolo import localize_with_yolo_seg  # noqa: E402
 
 
 def main() -> None:
@@ -39,10 +39,10 @@ def main() -> None:
     elapsed = (time.perf_counter() - started) * 1000
     print(f"dinov2: dim={vector.size} norm={np.linalg.norm(vector):.4f} {elapsed:.0f} ms")
 
-    localization = localize_with_yolo_sam(settings, registry, image)
+    localization = localize_with_yolo_seg(settings, registry, image)
     mask_pixels = int(localization.mask.sum()) if localization.mask is not None else 0
     print(
-        f"pipeline: status={localization.status} bbox={localization.bbox} "
+        f"v2 yolo-seg: status={localization.status} bbox={localization.bbox} "
         f"mask_pixels={mask_pixels} timings={localization.timings_ms}"
     )
 

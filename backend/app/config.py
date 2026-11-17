@@ -17,16 +17,15 @@ class Settings(BaseSettings):
     currency_symbol: str = "$"
     warm_models: bool = True
 
-    sam2_model_id: str = "facebook/sam2.1-hiera-tiny"
     dinov2_model_id: str = "facebook/dinov2-small"
-    yolo_det_model_id: str = "yolo26n.pt"
+    yolo_seg_model_id: str = "yolo26n-seg.onnx"
 
     input_size: int = 224
     max_upload_bytes: int = 10 * 1024 * 1024
     thumb_max_px: int = 320
 
-    # YOLO detects the item box; SAM2 segments it. Class labels are only used
-    # to filter detections, never for recognition.
+    # YOLO26n-seg returns the item box and mask in one pass. Class labels are
+    # only used to filter detections, never for recognition.
     yolo_conf: float = 0.25
     yolo_iou: float = 0.45
     yolo_imgsz: int = 640
@@ -36,11 +35,11 @@ class Settings(BaseSettings):
     yolo_max_area_ratio: float = 0.60
     yolo_center_weight: float = 0.15
 
-    # SAM2 mask selection against the YOLO box.
-    yolo_sam_min_pred_iou: float = 0.50
-    yolo_sam_min_box_iou: float = 0.40
-    yolo_sam_min_box_coverage: float = 0.75
-    yolo_sam_max_border_fraction: float = 0.10
+    # Mask selection against the detection box. YOLO masks are cropped to their
+    # box, so the box agreement thresholds stay loose.
+    mask_min_box_iou: float = 0.25
+    mask_min_box_coverage: float = 0.50
+    mask_max_border_fraction: float = 0.10
 
     @property
     def media_dir(self) -> Path:

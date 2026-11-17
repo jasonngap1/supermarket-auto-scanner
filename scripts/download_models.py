@@ -12,11 +12,11 @@ os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
 from huggingface_hub import HfApi, snapshot_download  # noqa: E402
 
 REPOS = {
-    "sam2": "facebook/sam2.1-hiera-tiny",
     "dinov2": "facebook/dinov2-small",
 }
 
-YOLO_MODEL = "yolo26n.pt"
+YOLO_MODEL = "yolo26n-seg.pt"
+YOLO_ONNX_MODEL = "yolo26n-seg.onnx"
 
 
 def download_repo(repo_id: str) -> dict:
@@ -43,18 +43,39 @@ def download_yolo(weights_dir: Path) -> dict:
         raise SystemExit("ultralytics is required; run: uv sync") from exc
 
     weights_dir.mkdir(parents=True, exist_ok=True)
+    pt_path = weights_dir / YOLO_MODEL
     previous = Path.cwd()
     os.chdir(weights_dir)
     try:
-        YOLO(YOLO_MODEL)
-        path = weights_dir / YOLO_MODEL
-        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        YOLO(str(pt_path))
+        if not pt_path.exists():
+            raise SystemExit(f"YOLO download did not produce {pt_path}")
+
+        # Static 640 input keeps ONNX Runtime happy without a dynamic-shape
+        # fallback. No simplifier or FP16: both are unreliable on CPU here.
+        exported = YOLO(str(pt_path)).export(
+            format="onnx",
+            imgsz=640,
+            dynamic=False,
+            simplify=False,
+            opset=18,
+            quantize=32,
+        )
+        onnx_path = Path(exported)
     finally:
         os.chdir(previous)
+
     return {
-        "filename": YOLO_MODEL,
-        "path": str(path),
-        "sha256": digest,
+        "pt": {
+            "filename": YOLO_MODEL,
+            "path": str(pt_path),
+            "sha256": hashlib.sha256(pt_path.read_bytes()).hexdigest(),
+        },
+        "onnx": {
+            "filename": onnx_path.name,
+            "path": str(onnx_path),
+            "sha256": hashlib.sha256(onnx_path.read_bytes()).hexdigest(),
+        },
     }
 
 

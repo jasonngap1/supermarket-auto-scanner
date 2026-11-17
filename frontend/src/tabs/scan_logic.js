@@ -1,5 +1,5 @@
-export const ADD_SCORE = 0.6;
-export const RELEASE_SCORE = 0.6;
+export const ADD_SCORE = 0.7;
+export const RELEASE_SCORE = 0.7;
 export const RELEASE_FRAMES = 3;
 export const SWITCH_FRAMES = 3;
 

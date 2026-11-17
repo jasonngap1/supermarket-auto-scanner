@@ -25,7 +25,7 @@ class FakePipeline:
         return SimpleNamespace(
             embeddings=embeddings,
             variant_status={"v2": self.status},
-            timings_ms={"yolo": 1.0, "sam2": 2.0, "embed": 1.0, "total": 4.0},
+            timings_ms={"yolo": 1.0, "embed": 1.0, "total": 2.0},
             localization=Localization(status=self.status, bbox=(5, 5, 40, 40)),
         )
 

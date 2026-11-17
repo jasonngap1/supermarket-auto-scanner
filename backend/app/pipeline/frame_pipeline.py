@@ -6,7 +6,7 @@ import numpy as np
 from app.errors import ModelUnavailable
 from app.pipeline.types import Localization
 from app.pipeline.variants import VARIANTS, preprocess_variant
-from app.pipeline.yolo import localize_with_yolo_sam
+from app.pipeline.yolo import localize_with_yolo_seg
 
 
 @dataclass(frozen=True)
@@ -23,11 +23,6 @@ class FramePipeline:
         self.registry = registry
         self.settings = settings
 
-    def localize(self, image_rgb: np.ndarray) -> Localization:
-        """YOLO box -> SAM2 mask, used to store the gallery thumbnail."""
-        with self.registry.gate():
-            return localize_with_yolo_sam(self.settings, self.registry, image_rgb)
-
     def analyze(self, image_rgb: np.ndarray, variant_ids: list[str]) -> PipelineOutput:
         with self.registry.gate():
             return self._analyze(image_rgb, variant_ids)
@@ -41,7 +36,7 @@ class FramePipeline:
         localization = Localization()
         if needs_mask:
             try:
-                localization = localize_with_yolo_sam(
+                localization = localize_with_yolo_seg(
                     self.settings, self.registry, image_rgb
                 )
             except ModelUnavailable:

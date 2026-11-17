@@ -9,7 +9,7 @@ import {
   observeScan,
 } from "./scan_logic.js";
 
-const SCAN_INTERVAL_MS = 1100;
+const SCAN_INTERVAL_MS = 250;
 
 let meta = null;
 let stream = null;

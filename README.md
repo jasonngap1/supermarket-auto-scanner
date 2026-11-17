@@ -3,9 +3,10 @@
 Local scanner app: hold an item in front of the camera, the app recognizes it,
 and adds it to a running cart with quantity, prices, and an order total.
 
-Recognition uses YOLO26n to find the item box, SAM2 to segment that box, and
-DINOv2 to embed the mask crop. The same chain runs when enrolling a gallery
-photo, so gallery and live vectors describe the same view.
+Recognition uses YOLO26n-seg to find the item box and its instance mask in one
+ONNX Runtime pass, then DINOv2 to embed the normalized mask crop. The same chain
+runs when enrolling a gallery photo, so gallery and live vectors describe the
+same view.
 
 ## Requirements
 
@@ -24,8 +25,10 @@ cd ../frontend
 npm install
 ```
 
-The download is roughly 250 MB: YOLO26n, SAM2, and DINOv2. Weights, caches, and
-the SQLite database live under `data/` (gitignored).
+The download fetches DINOv2 and `yolo26n-seg.pt`, then exports it to
+`data/weights/yolo26n-seg.onnx` with `imgsz=640` (about 250 MB total). Weights,
+caches, and the SQLite database live under `data/` (gitignored). Re-run the
+script after changing the YOLO model or export settings.
 
 ## Run
 
@@ -47,9 +50,9 @@ and device status.
 ## Use
 
 1. Open **Items**, add a name and price, and capture at least one gallery photo
-   per item. Show one item at a time. A frame is stored only when YOLO finds an
-   item box and SAM2 returns an accepted mask; the segmented thumbnail is used
-   in the cart.
+   per item. Show one item at a time. A frame is stored only when YOLO returns
+   both an item box and an accepted mask; the segmented thumbnail is used in
+   the cart. Item names and prices are editable after enrollment.
 2. Open **Scan** and show one item at a time to the camera. Scanning starts
    automatically. A frame with no detection reports `no_detection`; it does not
    match against the gallery.
@@ -58,14 +61,17 @@ and device status.
 
 ### Detection pipeline
 
-1. YOLO detects objects. One box is selected by confidence minus a
-   centre-distance penalty; `person` is rejected by default, as are boxes that
-   are too small, too large, or touch the frame border.
-2. SAM2 is prompted with the box and its centre point and returns three mask
-   candidates.
-3. A mask is rejected when its predicted IoU, overlap with the YOLO box, area,
-   or border leakage is outside the configured limits.
-4. The mask crop is letterboxed to 224x224 and embedded with DINOv2.
+1. YOLO26n-seg returns boxes plus masks at the original frame size. One box is
+   selected by confidence minus a centre-distance penalty; `person` is rejected
+   by default, as are boxes that are too small, too large, or touch the frame
+   border.
+2. The selected detection's mask is rejected when it is empty, its area or
+   border leakage is outside the configured limits, or its agreement with the
+   detection box is too loose.
+3. The mask crop is normalized: masked-pixel channel means are equalized
+   (gray-world white balance), then each channel is standardized to mean 128
+   and standard deviation 50. The same step runs for gallery and live frames.
+4. The normalized crop is letterboxed to 224x224 and embedded with DINOv2.
 
 YOLO class names are only used for filtering, never for recognition. Class
 coverage is the limiting factor: a product outside the 80 COCO classes produces
@@ -74,25 +80,25 @@ no detection. Tune `AUTO_SCANNER_YOLO_CONF` and the mask thresholds in
 
 ### Enrollment
 
-Enrollment runs YOLO -> SAM2 and stores the image, mask, and segmented
-thumbnail only when the frame has both a bounding box and an accepted mask.
-Frames with no detection are rejected with `no_detection`; frames where the
-mask fails selection are rejected with `mask_rejected`. Retake with one item
-centred in the frame.
+Enrollment runs YOLO26n-seg and stores the image, mask, and segmented thumbnail
+only when the frame has both a bounding box and an accepted mask. Frames with
+no detection are rejected with `no_detection`; frames where the mask fails
+selection are rejected with `mask_rejected`; model failures report
+`model_error`. Retake with one item centred in the frame.
 
 The gallery vector is computed on first scan from the stored mask.
 
 ### Duplicate guard
 
-A match is added at cosine similarity **0.60** or above. The scanner then locks
+A match is added at cosine similarity **0.70** or above. The scanner then locks
 that item so holding it in view does not add it repeatedly.
 
-The lock is released when the match drops below **0.60** (or no match is found)
+The lock is released when the match drops below **0.70** (or no match is found)
 for **3 consecutive scan frames**. It can also switch directly when a different
-item scores at least 0.60 for 3 consecutive frames.
+item scores at least 0.70 for 3 consecutive frames.
 
 Consequence: to scan the next unit of the *same* item, remove the current item
-from view for about 3 frames (~3.3 seconds), then show the next unit. Two
+from view for about 3 frames (under a second at the current cadence), then show the next unit. Two
 physically identical units swapped with no visible gap cannot be distinguished.
 The thresholds live at the top of `frontend/src/tabs/scan_logic.js`.
 
@@ -131,14 +137,15 @@ scan and skipped when no mask can be found.
 
 ## Performance on the M1
 
-Measured with the validation lab's benchmark on five stored captures:
+Measured on the current stored captures with `scripts/benchmark_yolo.py`:
 
-- YOLO detection: p50 ~25 ms.
-- SAM2 segmentation: ~0.42 s per accepted frame.
+- YOLO26n-seg ONNX: p50 ~77 ms, p95 ~107 ms per frame (CPU ExecutionProvider).
 - Warm DINOv2: ~20 ms.
-- End-to-end mask vector: roughly 0.45-0.5 s.
+- End-to-end `v2` on an accepted frame: roughly 100 ms.
 
-The frontend scans about once per second and skips overlapping requests.
+The frontend scans every 250 ms and skips overlapping requests. ONNX Runtime
+runs on CPU; the `.pt` MPS detector was faster per call but the segmenting
+model replaces a separate SAM2 stage, so the full loop is much shorter.
 
 ## Tests
 
@@ -157,8 +164,13 @@ cd backend && RUN_MODEL_TESTS=1 RUN_YOLO_TESTS=1 uv run pytest -m slow -q
 
 ## Notes
 
-- `v2` (YOLO box -> SAM2 mask -> DINOv2) is the only matching view. The
-  whole-frame control variant remains in the pipeline code for comparison.
+- `v2` (YOLO26n-seg box + mask -> normalized crop -> DINOv2) is the only
+  matching view. The whole-frame control variant remains in the pipeline code
+  for comparison.
+- The ONNX export pins `imgsz=640`. Changing `AUTO_SCANNER_YOLO_IMGSZ` requires
+  re-running `scripts/download_models.py` and invalidates `v2` vectors.
+- Photometric normalization and the YOLO-seg switch changed the embedding
+  distribution, so the 0.70 add threshold may need retuning.
 - The frontend shows no model names, scores, or timings.
 - Matching is exact cosine. HNSW is deferred behind `VectorIndex`.
 - Ultralytics and the YOLO26 weights are AGPL-3.0. This is acceptable for the

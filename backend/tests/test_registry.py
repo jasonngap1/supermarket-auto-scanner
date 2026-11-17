@@ -5,7 +5,7 @@ from app.config import Settings
 from app.errors import ModelUnavailable
 from app.ml.devices import resolve_device
 from app.ml.registry import ModelRegistry
-from app.pipeline.types import Detection, PromptSpec
+from app.pipeline.types import Detection
 
 
 class FakeEmbedder:
@@ -17,17 +17,6 @@ class FakeEmbedder:
 
     def embed(self, image):
         return np.ones(4, dtype=np.float32)
-
-
-class FakeSegmenter:
-    def __init__(self, model_id=None, device="cpu", **kwargs):
-        self.model_id = model_id
-        self.device = device
-        self.prompt = None
-
-    def segment(self, image, prompt):
-        self.prompt = prompt
-        return []
 
 
 class FakeYolo:
@@ -45,7 +34,6 @@ def make_registry(tmp_path):
     return ModelRegistry(
         settings,
         dinov2_factory=FakeEmbedder,
-        sam2_factory=FakeSegmenter,
         yolo_factory=FakeYolo,
     )
 
@@ -54,7 +42,6 @@ def test_lazy_loading_and_status(tmp_path):
     registry = make_registry(tmp_path)
     status = registry.status()["models"]
     assert status["dinov2"]["loaded"] is False
-    assert status["sam2"]["loaded"] is False
     assert status["yolo"]["loaded"] is False
 
     vector = registry.embed(np.zeros((8, 8, 3), dtype=np.uint8))
@@ -63,9 +50,8 @@ def test_lazy_loading_and_status(tmp_path):
     assert registry.status()["device"]["resolved"] == resolve_device("cpu")
 
 
-def test_segment_and_detect_objects_dispatch(tmp_path):
+def test_detect_objects_dispatch(tmp_path):
     registry = make_registry(tmp_path)
-    assert registry.segment(np.zeros((8, 8, 3), dtype=np.uint8), PromptSpec()) == []
     detections = registry.detect_objects(np.zeros((8, 8, 3), dtype=np.uint8))
     assert detections[0].class_name == "banana"
 

@@ -6,6 +6,11 @@ class ItemCreate(BaseModel):
     price_cents: int = Field(ge=0)
 
 
+class ItemUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    price_cents: int | None = Field(default=None, ge=0)
+
+
 class ItemOut(BaseModel):
     id: int
     name: str

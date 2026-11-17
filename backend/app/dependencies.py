@@ -32,6 +32,6 @@ def build_default_state(settings: Settings) -> AppState:
         settings,
         registry=registry,
         pipeline=pipeline,
-        captures=CaptureService(settings, pipeline),
+        captures=CaptureService(settings, registry),
         scan=ScanService(settings, pipeline, embeddings),
     )
