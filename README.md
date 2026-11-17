@@ -93,14 +93,18 @@ The gallery vector is computed on first scan from the stored mask.
 A match is added at cosine similarity **0.70** or above. The scanner then locks
 that item so holding it in view does not add it repeatedly.
 
-The lock is released when the match drops below **0.70** (or no match is found)
-for **3 consecutive scan frames**. It can also switch directly when a different
-item scores at least 0.70 for 3 consecutive frames.
+A missed frame does not by itself release the lock. Release needs the item to be
+gone for **1.2 s** *and* the camera view to have changed from the locked
+presentation, compared through an 8x8 luma signature that ignores global
+brightness shifts. A frame where YOLO finds an object but rejects its mask also
+counts as still in view. A detector dropout over an unchanged view therefore
+keeps the lock and cannot add the same unit twice. A different item scoring at
+least 0.70 for 3 consecutive frames switches the lock directly.
 
-Consequence: to scan the next unit of the *same* item, remove the current item
-from view for about 3 frames (under a second at the current cadence), then show the next unit. Two
-physically identical units swapped with no visible gap cannot be distinguished.
-The thresholds live at the top of `frontend/src/tabs/scan_logic.js`.
+Consequence: to scan the next unit of the *same* item, move it out of view for
+about 1.2 s, then show the next unit. Two physically identical units swapped
+with no visible gap cannot be distinguished. The thresholds live at the top of
+`frontend/src/tabs/scan_logic.js`.
 
 ## Storage
 

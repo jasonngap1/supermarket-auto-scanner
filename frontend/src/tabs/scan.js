@@ -1,6 +1,11 @@
 import { scanFrame } from "../api.js";
 import { playBeep, primeBeep } from "../beep.js";
-import { captureFrame, startCamera, stopCamera } from "../camera.js";
+import {
+  captureFrame,
+  frameSignature,
+  startCamera,
+  stopCamera,
+} from "../camera.js";
 import { renderCart, renderCartTotal } from "./cart.js";
 import { addToCart, removeFromCart } from "./cart_logic.js";
 import {
@@ -65,10 +70,15 @@ function clearAnnotated() {
   image.removeAttribute("src");
 }
 
-function applyScan(body) {
+function applyScan(body, signature) {
   showAnnotated(body);
 
-  const result = observeScan(scanState, bestFromResponse(body));
+  const result = observeScan(scanState, {
+    now: performance.now(),
+    best: bestFromResponse(body),
+    maskRejected: body.status === "mask_rejected",
+    signature,
+  });
   scanState = result.state;
 
   if (result.added) {
@@ -115,8 +125,9 @@ async function analyzeOnce() {
   if (!video.videoWidth) return;
   busy = true;
   try {
+    const signature = frameSignature(video);
     const blob = await captureFrame(video);
-    applyScan(await scanFrame(blob));
+    applyScan(await scanFrame(blob), signature);
   } catch (error) {
     status(error.message, true);
   } finally {
