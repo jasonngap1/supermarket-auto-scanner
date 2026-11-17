@@ -72,7 +72,7 @@ class ModelRegistry:
         if self._yolo is None:
             try:
                 self._yolo = self._factories["yolo"](
-                    model_id=self.settings.yolo_det_model_id,
+                    model_id=self.settings.yolo_seg_model_id,
                     device=self._device_for("yolo"),
                     conf=self.settings.yolo_conf,
                     iou=self.settings.yolo_iou,
@@ -87,8 +87,10 @@ class ModelRegistry:
         return self._yolo
 
     def warm(self) -> None:
+        # SAM2 is evaluation-only (variant v3), so it loads on first use rather
+        # than holding memory during normal scanning.
         with self._gate:
-            for ensure in (self._ensure_embedder, self._ensure_sam2, self._ensure_yolo):
+            for ensure in (self._ensure_embedder, self._ensure_yolo):
                 try:
                     ensure()
                 except ModelUnavailable:
@@ -151,9 +153,9 @@ class ModelRegistry:
                 },
                 "yolo": {
                     "loaded": self._yolo is not None,
-                    "device": self._device_for("yolo"),
+                    "device": getattr(self._yolo, "device", self._device_for("yolo")),
                     "error": self._errors["yolo"],
-                    "model_id": self.settings.yolo_det_model_id,
+                    "model_id": self.settings.yolo_seg_model_id,
                 },
             },
         }

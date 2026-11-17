@@ -34,6 +34,15 @@ describe("scan logic", () => {
     expect(isErrorStatus(body)).toBe(true);
   });
 
+  it("treats v3 as a mask variant for status", () => {
+    expect(
+      statusMessage({ variants: [{ variant: "v3", status: "no_detection" }] }),
+    ).toMatch(/centre/);
+    expect(
+      statusMessage({ variants: [{ variant: "v3", status: "ok" }] }),
+    ).toBe("OK");
+  });
+
   it("treats an accepted mask as success", () => {
     const body = {
       variants: [

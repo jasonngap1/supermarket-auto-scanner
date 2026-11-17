@@ -7,8 +7,14 @@ import numpy as np
 from app.config import Settings
 from app.db import db
 from app.domain import Capture, Role
-from app.errors import DuplicateCapture, ImageTooLarge, InvalidImage
+from app.errors import (
+    DuplicateCapture,
+    ImageTooLarge,
+    InvalidImage,
+    ModelUnavailable,
+)
 from app.matching.vector_index import normalize
+from app.pipeline.yolo import localize_with_yolo_seg
 from app.services.storage import (
     CaptureArtifacts,
     decode_image,
@@ -39,6 +45,8 @@ def add_capture(
     sha256: str,
     width: int,
     height: int,
+    mask_found: bool = False,
+    mask_status: str = "not_localized",
 ) -> Capture:
     try:
         with db(settings) as connection:
@@ -53,7 +61,7 @@ def add_capture(
                 (
                     item_id, role, session_id, artifacts.rel_path,
                     artifacts.thumb_rel_path, artifacts.mask_rel_path, sha256,
-                    width, height, 0, "not_localized", "{}", _now(),
+                    width, height, int(mask_found), mask_status, "{}", _now(),
                 ),
             )
             capture_id = int(cursor.lastrowid)
@@ -217,9 +225,24 @@ class CaptureUploadResult:
 NEAR_DUPLICATE_THRESHOLD = 0.995
 
 
+def remove_artifact_files(settings: Settings, artifacts: CaptureArtifacts) -> None:
+    for rel_path in (
+        artifacts.rel_path,
+        artifacts.thumb_rel_path,
+        artifacts.mask_rel_path,
+    ):
+        if not rel_path:
+            continue
+        try:
+            resolve_media_path(settings, rel_path).unlink(missing_ok=True)
+        except (OSError, ValueError):
+            pass
+
+
 class CaptureService:
-    def __init__(self, settings, embeddings=None):
+    def __init__(self, settings, registry, embeddings=None):
         self.settings = settings
+        self.registry = registry
         self.embeddings = embeddings
 
     def _near_duplicate_score(self, capture: Capture, role: str) -> float | None:
@@ -255,7 +278,30 @@ class CaptureService:
         if capture_duplicate_exists(self.settings, item_id, role, digest):
             return CaptureUploadResult(False, reason="duplicate")
 
-        artifacts = save_capture_bundle(self.settings, item_id, image)
+        # Enrollment stores only frames with both a YOLO bounding box and an
+        # accepted segmentation mask; reject before writing any file.
+        with self.registry.gate():
+            try:
+                localization = localize_with_yolo_seg(
+                    self.settings, self.registry, image
+                )
+            except ModelUnavailable:
+                return CaptureUploadResult(False, reason="model_error")
+        if (
+            localization.status != "ok"
+            or localization.mask is None
+            or localization.bbox is None
+        ):
+            reason = (
+                localization.status
+                if localization.status in ("no_detection", "mask_rejected")
+                else "mask_rejected"
+            )
+            return CaptureUploadResult(False, reason=reason)
+
+        artifacts = save_capture_bundle(
+            self.settings, item_id, image, localization.mask
+        )
         try:
             capture = add_capture(
                 self.settings,
@@ -266,8 +312,11 @@ class CaptureService:
                 sha256=digest,
                 width=width,
                 height=height,
+                mask_found=True,
+                mask_status="ok",
             )
         except DuplicateCapture:
+            remove_artifact_files(self.settings, artifacts)
             return CaptureUploadResult(False, reason="duplicate")
         score = self._near_duplicate_score(capture, role)
         return CaptureUploadResult(

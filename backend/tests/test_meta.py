@@ -9,5 +9,6 @@ def test_meta_lists_variants_and_currency(tmp_path):
     with TestClient(create_app(settings)) as client:
         body = client.get("/api/meta").json()
     assert body["currency_symbol"] == "$"
-    assert [v["id"] for v in body["variants"]] == ["v0", "v2"]
+    assert [v["id"] for v in body["variants"]] == ["v0", "v2", "v3"]
     assert body["variants"][1]["crop"] == "mask"
+    assert body["variants"][2]["crop"] == "mask"

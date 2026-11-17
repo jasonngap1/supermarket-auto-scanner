@@ -49,12 +49,15 @@ class AnalysisService:
                 else:
                     top_items = item_topk(output.embeddings[variant_id], entries, k=3)
                 match_ms = (time.perf_counter() - match_start) * 1000
-            timings = {
-                **{
+            variant_timings = output.variant_timings.get(variant_id)
+            if variant_timings is None:
+                variant_timings = {
                     key: value
                     for key, value in output.timings_ms.items()
                     if key not in ("embed", "total")
-                },
+                }
+            timings = {
+                **variant_timings,
                 "embed": output.embed_ms.get(variant_id, 0.0),
                 "match": match_ms,
             }

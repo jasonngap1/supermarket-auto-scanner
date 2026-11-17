@@ -10,6 +10,9 @@ let timer = null;
 let busy = false;
 let selected = new Set();
 
+// SAM2 (v3) is a comparison variant; keep the live loop on YOLO-seg only.
+const DEFAULT_SELECTED = new Set(["v0", "v2"]);
+
 function renderVariants() {
   const container = document.getElementById("scan-variants");
   container.replaceChildren();
@@ -19,7 +22,7 @@ function renderVariants() {
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
     checkbox.value = variant.id;
-    checkbox.checked = true;
+    checkbox.checked = DEFAULT_SELECTED.has(variant.id);
     checkbox.addEventListener("change", () => {
       if (checkbox.checked) selected.add(variant.id);
       else selected.delete(variant.id);
@@ -101,7 +104,7 @@ async function analyzeOnce() {
 
 function setAuto(enabled) {
   if (timer) clearInterval(timer);
-  timer = enabled ? setInterval(analyzeOnce, 1100) : null;
+  timer = enabled ? setInterval(analyzeOnce, 250) : null;
 }
 
 export function initScan(metaData) {

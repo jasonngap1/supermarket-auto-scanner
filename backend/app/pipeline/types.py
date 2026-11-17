@@ -31,6 +31,9 @@ class Detection:
     class_name: str
     confidence: float
     bbox: tuple[float, float, float, float]
+    # Boolean HxW mask at the original frame size. compare/repr are off so
+    # equality and logging never touch the array.
+    mask: np.ndarray | None = field(default=None, compare=False, repr=False)
 
 
 @dataclass(frozen=True)

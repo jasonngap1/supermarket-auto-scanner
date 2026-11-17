@@ -7,7 +7,9 @@ export function bestTop(variants) {
 }
 
 function maskVariants(variants) {
-  return variants.filter((variant) => variant.variant === "v2");
+  return variants.filter(
+    (variant) => variant.variant === "v2" || variant.variant === "v3",
+  );
 }
 
 function allFailed(variants, statuses) {

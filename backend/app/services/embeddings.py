@@ -12,7 +12,11 @@ from app.pipeline.variants import (
     embedding_preprocess_version,
     preprocess_variant,
 )
-from app.pipeline.yolo import localize_with_yolo_sam
+from app.pipeline.yolo import (
+    detect_and_select,
+    localize_with_sam,
+    localize_with_yolo_seg,
+)
 from app.services.captures import (
     get_embedding,
     list_gallery_captures,
@@ -49,9 +53,22 @@ class EmbeddingService:
         timings: dict[str, float] = {}
         if variant.crop == "mask":
             try:
-                localization = localize_with_yolo_sam(
-                    self.settings, self.registry, image
-                )
+                if variant_id == "v3":
+                    detections, selection, yolo_ms = detect_and_select(
+                        self.settings, self.registry, image
+                    )
+                    timings["yolo"] = yolo_ms
+                    localization = localize_with_sam(
+                        self.settings,
+                        self.registry,
+                        image,
+                        detections,
+                        selection,
+                    )
+                else:
+                    localization = localize_with_yolo_seg(
+                        self.settings, self.registry, image
+                    )
             except ModelUnavailable:
                 return VectorResult(None, "model_error", timings)
             timings.update(localization.timings_ms)

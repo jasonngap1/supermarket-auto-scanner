@@ -3,11 +3,36 @@ import threading
 import numpy as np
 
 from app.config import Settings
-from app.pipeline.types import MaskCandidate
+from app.pipeline.types import Detection, MaskCandidate
 
 
 def make_settings(tmp_path):
     return Settings(data_dir=tmp_path, device="cpu", warm_models=False)
+
+
+def box_mask(bbox=(20, 20, 80, 80), shape=(100, 100)):
+    mask = np.zeros(shape, dtype=bool)
+    x1, y1, x2, y2 = (int(value) for value in bbox)
+    mask[y1:y2, x1:x2] = True
+    return mask
+
+
+def detection(
+    bbox=(20, 20, 80, 80),
+    *,
+    class_id=46,
+    class_name="banana",
+    confidence=0.9,
+    with_mask=True,
+):
+    return Detection(
+        index=0,
+        class_id=class_id,
+        class_name=class_name,
+        confidence=confidence,
+        bbox=tuple(float(value) for value in bbox),
+        mask=box_mask(bbox) if with_mask else None,
+    )
 
 
 class FakeSam2:

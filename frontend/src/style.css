@@ -80,11 +80,14 @@ input {
   background: #151922;
 }
 .card strong { font-size: 18px; }
-.list button {
-  display: block;
-  width: 100%;
-  text-align: left;
+.item-row {
+  display: flex;
+  gap: 6px;
   margin: 6px 0;
+}
+.item-row > button:first-child {
+  flex: 1;
+  text-align: left;
 }
 .capture-grid {
   display: grid;

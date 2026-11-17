@@ -53,6 +53,37 @@ def get_item(settings: Settings, item_id: int) -> Item | None:
     return Item(**dict(row)) if row else None
 
 
+def update_item(
+    settings: Settings,
+    item_id: int,
+    *,
+    name: str | None = None,
+    price_cents: int | None = None,
+) -> Item | None:
+    fields: dict[str, object] = {}
+    if name is not None:
+        name = name.strip()
+        if not name:
+            raise ValueError("Item name cannot be empty")
+        fields["name"] = name
+    if price_cents is not None:
+        if price_cents < 0:
+            raise ValueError("Price cannot be negative")
+        fields["price_cents"] = int(price_cents)
+    if not fields:
+        raise ValueError("No fields to update")
+
+    assignments = ", ".join(f"{column} = ?" for column in fields)
+    with db(settings) as connection:
+        cursor = connection.execute(
+            f"UPDATE items SET {assignments} WHERE id = ?",
+            (*fields.values(), item_id),
+        )
+    if cursor.rowcount == 0:
+        return None
+    return get_item(settings, item_id)
+
+
 def delete_item(settings: Settings, item_id: int) -> bool:
     from app.services.captures import list_captures, remove_capture_files
 

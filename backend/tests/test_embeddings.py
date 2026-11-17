@@ -3,10 +3,9 @@ from types import SimpleNamespace
 import numpy as np
 
 from app.config import Settings
-from app.pipeline.types import Detection
 from app.services import embeddings as embeddings_module
 from app.services.embeddings import EmbeddingService
-from tests.fakes import FakeRegistry
+from tests.fakes import FakeRegistry, detection
 
 
 def service_and_cache(tmp_path, monkeypatch, registry):
@@ -32,9 +31,7 @@ def service_and_cache(tmp_path, monkeypatch, registry):
 
 
 def test_v2_detects_once_and_reuses_cache(tmp_path, monkeypatch):
-    registry = FakeRegistry(
-        detections=[Detection(0, 46, "banana", 0.9, (20, 20, 80, 80))]
-    )
+    registry = FakeRegistry(detections=[detection()])
     service, versions = service_and_cache(tmp_path, monkeypatch, registry)
     capture = SimpleNamespace(id=1, rel_path="image.jpg")
 
@@ -46,13 +43,12 @@ def test_v2_detects_once_and_reuses_cache(tmp_path, monkeypatch):
     assert np.array_equal(first.vector, second.vector)
     assert registry.detect_calls == 1
     assert versions[0] == versions[1]
-    assert "yolo-sam-v1" in versions[0]
+    assert "yolo-seg-v1" in versions[0]
+    assert "mask-norm-v1" in versions[0]
 
 
 def test_v0_uses_a_different_cache_version_and_no_detection(tmp_path, monkeypatch):
-    registry = FakeRegistry(
-        detections=[Detection(0, 46, "banana", 0.9, (20, 20, 80, 80))]
-    )
+    registry = FakeRegistry(detections=[detection()])
     service, versions = service_and_cache(tmp_path, monkeypatch, registry)
     capture = SimpleNamespace(id=1, rel_path="image.jpg")
 
@@ -73,3 +69,21 @@ def test_v2_reports_no_detection_without_caching(tmp_path, monkeypatch):
     assert result.status == "no_detection"
     assert service.get_capture_vector(capture, "v2") is None
     assert registry.detect_calls == 2
+
+
+def test_v3_runs_sam_and_uses_a_distinct_version(tmp_path, monkeypatch):
+    registry = FakeRegistry(detections=[detection()])
+    service, versions = service_and_cache(tmp_path, monkeypatch, registry)
+    capture = SimpleNamespace(id=1, rel_path="image.jpg")
+
+    v3_result = service.get_capture_vector_details(capture, "v3")
+    v3_version = versions[0]
+    service.get_capture_vector_details(capture, "v2")
+    v2_version = versions[-1]
+
+    assert v3_result.vector is not None
+    assert registry.detect_calls == 2
+    assert registry.segmenter.calls == 1
+    assert ":sam2" in v3_version
+    assert ":sam2" not in v2_version
+    assert v3_version != v2_version

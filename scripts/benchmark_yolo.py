@@ -9,7 +9,10 @@ sys.path.insert(0, str(ROOT / "backend"))
 from app import bootstrap  # noqa: E402,F401
 from app.config import Settings  # noqa: E402
 from app.ml.registry import ModelRegistry  # noqa: E402
-from app.pipeline.yolo import localize_with_yolo_sam  # noqa: E402
+from app.pipeline.yolo import (  # noqa: E402
+    localize_with_sam,
+    localize_with_yolo_seg,
+)
 from app.services.captures import (  # noqa: E402
     list_gallery_captures,
     list_test_captures,
@@ -17,7 +20,7 @@ from app.services.captures import (  # noqa: E402
 from app.services.embeddings import EmbeddingService  # noqa: E402
 from app.services.storage import load_image_rgb  # noqa: E402
 
-EMBED_VARIANTS = ("v0", "v2")
+EMBED_VARIANTS = ("v0", "v2", "v3")
 
 
 def percentile(values: list[float], fraction: float) -> float:
@@ -38,6 +41,9 @@ def main() -> None:
     )
     parser.add_argument("--conf", type=float, default=None)
     parser.add_argument("--reject-classes", default=None)
+    parser.add_argument(
+        "--sam2", action="store_true", help="Also measure the v3 SAM2 comparison"
+    )
     args = parser.parse_args()
 
     overrides = {}
@@ -65,17 +71,17 @@ def main() -> None:
         raise SystemExit("No stored captures found")
 
     first_image = load_image_rgb(settings, rows[0][1].rel_path)
-    localize_with_yolo_sam(settings, registry, first_image)
+    localize_with_yolo_seg(settings, registry, first_image)
 
     latencies: dict[str, list[float]] = {"yolo": [], "sam2": []}
     accepted = 0
+    sam_accepted = 0
     for name, capture, _label in rows:
         image = load_image_rgb(settings, capture.rel_path)
-        localization = localize_with_yolo_sam(settings, registry, image)
+        localization = localize_with_yolo_seg(settings, registry, image)
         accepted += localization.status == "ok"
-        for stage in latencies:
-            if stage in localization.timings_ms:
-                latencies[stage].append(localization.timings_ms[stage])
+        if "yolo" in localization.timings_ms:
+            latencies["yolo"].append(localization.timings_ms["yolo"])
         selected = localization.detection_selection.selected
         selected_text = (
             "-"
@@ -85,13 +91,32 @@ def main() -> None:
         )
         mask_pixels = int(localization.mask.sum()) if localization.mask is not None else 0
         print(
-            f"{name} {localization.status:12s} selected={selected_text} "
+            f"{name} v2 {localization.status:12s} selected={selected_text} "
             f"mask_pixels={mask_pixels} timings="
             f"{ {k: round(v, 1) for k, v in localization.timings_ms.items()} }"
         )
 
+        if args.sam2:
+            sam = localize_with_sam(
+                settings,
+                registry,
+                image,
+                localization.detections,
+                localization.detection_selection,
+            )
+            sam_accepted += sam.status == "ok"
+            if "sam2" in sam.timings_ms:
+                latencies["sam2"].append(sam.timings_ms["sam2"])
+            sam_pixels = int(sam.mask.sum()) if sam.mask is not None else 0
+            print(
+                f"{name} v3 {sam.status:12s} mask_pixels={sam_pixels} "
+                f"timings={ {k: round(v, 1) for k, v in sam.timings_ms.items()} }"
+            )
+
     print()
-    print(f"accepted {accepted}/{len(rows)}")
+    print(f"v2 accepted {accepted}/{len(rows)}")
+    if args.sam2:
+        print(f"v3 accepted {sam_accepted}/{len(rows)}")
     for stage, values in latencies.items():
         p50 = statistics.median(values) if values else 0.0
         print(f"{stage}: p50 {p50:.1f} ms p95 {percentile(values, 0.95):.1f} ms")

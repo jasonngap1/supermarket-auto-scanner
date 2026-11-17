@@ -48,11 +48,15 @@ def test_yolo_contract():
     if os.getenv("RUN_YOLO_TESTS") != "1":
         pytest.skip("set RUN_YOLO_TESTS=1 with downloaded YOLO weights")
     pytest.importorskip("ultralytics")
+    pytest.importorskip("onnxruntime")
 
     from app.config import Settings
     from app.ml.registry import ModelRegistry
 
     settings = Settings(warm_models=False)
+    weights = settings.data_dir / "weights" / settings.yolo_seg_model_id
+    if not weights.exists():
+        pytest.skip(f"missing {weights}; run scripts/download_models.py")
     registry = ModelRegistry(settings)
     frame = np.full((480, 640, 3), 127, dtype=np.uint8)
     detections = registry.detect_objects(frame)
@@ -60,3 +64,4 @@ def test_yolo_contract():
     for detection in detections:
         assert 0.0 <= detection.confidence <= 1.0
         assert len(detection.bbox) == 4
+        assert detection.mask is None or detection.mask.dtype == bool
