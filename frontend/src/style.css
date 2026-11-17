@@ -163,20 +163,19 @@ input {
 .status { min-height: 24px; margin: 10px 0; color: #93c5fd; }
 .status.error { color: #fca5a5; }
 .muted { color: #94a3b8; font-size: 13px; }
-.list button {
-  display: block;
-  width: 100%;
-  text-align: left;
-  margin: 6px 0;
-}
 .item-row {
   display: flex;
+  align-items: center;
   gap: 6px;
   margin: 6px 0;
 }
 .item-row > button:first-child {
   flex: 1;
+  min-width: 0;
   text-align: left;
+}
+.item-row > button:last-child {
+  flex: none;
 }
 .capture-grid {
   display: grid;
