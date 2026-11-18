@@ -102,6 +102,10 @@ function applyScan(body, signature) {
     status("Models unavailable. Check the backend.", true);
     return;
   }
+  if (scanState.pendingItemId != null) {
+    status("Hold the item steady to add it.");
+    return;
+  }
   if (body.status === "no_detection") {
     status("No item detected. Show one item to the camera.");
     return;

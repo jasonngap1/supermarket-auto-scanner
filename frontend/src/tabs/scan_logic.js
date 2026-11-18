@@ -1,5 +1,6 @@
 export const ADD_SCORE = 0.7;
 export const RELEASE_SCORE = 0.7;
+export const CONFIRM_MS = 500;
 export const RELEASE_MS = 1200;
 export const SWITCH_FRAMES = 3;
 // Mean-centred mean absolute difference between two 8x8 luma signatures.
@@ -14,6 +15,10 @@ export function createScanState() {
     absentSince: null,
     switchItemId: null,
     switchFrames: 0,
+    pendingItemId: null,
+    pendingBest: null,
+    pendingSignature: null,
+    pendingSince: null,
   };
 }
 
@@ -61,10 +66,12 @@ export function signatureDistance(first, second) {
  *   held item did not leave the view.
  * - signature: 8x8 luma signature of the captured frame, or null.
  *
- * A gate stays locked until the item is absent for RELEASE_MS *and* the view
- * has changed from the locked presentation, or a different item wins for
- * SWITCH_FRAMES. A model dropout over an unchanged scene never releases it,
- * which is what stops one physical item from being added twice.
+ * A match must hold for CONFIRM_MS before it is added, so the item is settled
+ * in front of the camera. A gate stays locked until the item is absent for
+ * RELEASE_MS *and* the view has changed from the locked presentation, or a
+ * different item wins for SWITCH_FRAMES. A model dropout over an unchanged
+ * scene never releases it, which is what stops one physical item from being
+ * added twice.
  */
 export function observeScan(state, observation = {}) {
   const {
@@ -76,15 +83,48 @@ export function observeScan(state, observation = {}) {
 
   if (state.lockedItemId == null) {
     if (best && best.score >= ADD_SCORE) {
+      const sameCandidate = state.pendingItemId === best.item_id;
+      const pendingSince = sameCandidate ? (state.pendingSince ?? now) : now;
+      if (now - pendingSince >= CONFIRM_MS) {
+        return {
+          state: {
+            ...createScanState(),
+            lockedItemId: best.item_id,
+            referenceSignature: signature ?? state.pendingSignature,
+          },
+          added: best,
+          released: false,
+        };
+      }
       return {
         state: {
-          ...createScanState(),
-          lockedItemId: best.item_id,
-          referenceSignature: signature,
+          ...state,
+          pendingItemId: best.item_id,
+          pendingBest: best,
+          pendingSignature: signature ?? state.pendingSignature,
+          pendingSince,
         },
-        added: best,
+        added: null,
         released: false,
       };
+    }
+
+    // Without a current match, a pending candidate survives only while the
+    // camera still shows it. The add waits for the next positive frame so the
+    // item is matched on evidence from the settled presentation.
+    if (state.pendingItemId != null) {
+      const viewHeld =
+        signature != null &&
+        state.pendingSignature != null &&
+        signatureDistance(signature, state.pendingSignature) <=
+          SAME_VIEW_DISTANCE;
+      if (!maskRejected && !viewHeld) {
+        return {
+          state: createScanState(),
+          added: null,
+          released: false,
+        };
+      }
     }
     return { state, added: null, released: false };
   }

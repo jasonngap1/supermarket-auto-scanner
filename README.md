@@ -90,8 +90,11 @@ The gallery vector is computed on first scan from the stored mask.
 
 ### Duplicate guard
 
-A match is added at cosine similarity **0.70** or above. The scanner then locks
-that item so holding it in view does not add it repeatedly.
+A match is added at cosine similarity **0.70** or above only after it holds for
+**0.5 s**, so a frame with both a bbox and a mask has shown a settled item before
+it can register. A detector dropout during that window over an unchanged view
+does not restart the wait, and an add always uses a positive (bbox + mask) frame.
+The scanner then locks that item so holding it in view does not add it repeatedly.
 
 A missed frame does not by itself release the lock. Release needs the item to be
 gone for **1.2 s** *and* the camera view to have changed from the locked
