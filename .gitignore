@@ -218,3 +218,14 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Project data and local tooling
+data/
+backend/assets/*.task
+backend/.venv/
+.env
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+.DS_Store
