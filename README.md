@@ -154,6 +154,26 @@ The frontend scans every 250 ms and skips overlapping requests. ONNX Runtime
 runs on CPU; the `.pt` MPS detector was faster per call but the segmenting
 model replaces a separate SAM2 stage, so the full loop is much shorter.
 
+### Compute footprint
+
+Measured on an 8-core Apple M1 with 16 GB RAM, `device=auto` (DINOv2 on MPS,
+YOLO ONNX on CPU), with the current gallery of 8 items and 22 captures:
+
+- Backend, models warm and idle: about **435 MB** physical footprint.
+- Backend after scanning: about **585 MB** peak.
+- Vite dev server: about **50 MB**.
+- Idle CPU: near zero.
+- One accepted scan frame: about **0.11-0.15 s** wall-clock. It costs roughly
+  **0.6 CPU-seconds**, spread across the ONNX Runtime thread pool, so a scan
+  burst can occupy about 4 cores briefly. Scanning every 250 ms averages around
+  2.4 cores while the **Scan** tab is open. Raise `SCAN_INTERVAL_MS` in
+  `frontend/src/tabs/scan.js` to lower the average proportionally.
+
+No GPU is required; `AUTO_SCANNER_DEVICE=cpu` forces CPU-only for both models.
+Under 0.7 GB of server memory is enough for the current catalog. Keep the `v3`
+SAM2 variant unselected on memory-limited hosts: it loads a second, larger model
+on first use. The browser tab and camera pipeline are outside these figures.
+
 ## Tests
 
 ```bash
