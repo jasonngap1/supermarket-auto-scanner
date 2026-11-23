@@ -3,39 +3,51 @@
   "items": [
     {
       "id": 8,
-      "name": "Adopt a cow milk 200g",
+      "name": "ADOPT A COW Milk (200g)",
       "price_cents": 1200,
       "created_at": "2026-11-18T05:21:50+00:00"
     },
     {
       "id": 9,
-      "name": "Vitasoy low sugar malted soyabean milk 330ml",
+      "name": "VITASOY Low Sugar Malted Soyabean Milk (330ml)",
       "price_cents": 1800,
       "created_at": "2026-11-18T05:24:50+00:00"
     },
     {
       "id": 10,
-      "name": "The coffee academics BRAZIL coffee bag",
+      "name": "THE COFFEE ACADEMICS BRAZIL Coffee Bag",
       "price_cents": 800,
       "created_at": "2026-11-18T05:27:42+00:00"
     },
     {
       "id": 11,
-      "name": "Haribo goldbears candy",
+      "name": "HARIBO GOLDBEARS Candy Packet",
       "price_cents": 200,
       "created_at": "2026-11-18T05:29:37+00:00"
     },
     {
       "id": 12,
-      "name": "Dewberry cookie",
+      "name": "DEWBERRY Blueberry Cookie",
       "price_cents": 300,
       "created_at": "2026-11-18T05:31:51+00:00"
     },
     {
       "id": 13,
-      "name": "Hello kitty toy",
+      "name": "HELLO KITTY Small Toy",
       "price_cents": 2000,
       "created_at": "2026-11-18T05:34:58+00:00"
+    },
+    {
+      "id": 14,
+      "name": "Apple Tea",
+      "price_cents": 1000,
+      "created_at": "2026-11-18T08:59:17+00:00"
+    },
+    {
+      "id": 15,
+      "name": "Lemon Tea",
+      "price_cents": 1000,
+      "created_at": "2026-11-18T08:59:27+00:00"
     }
   ],
   "captures": [
@@ -276,6 +288,142 @@
       "mask_status": "ok",
       "localization_json": "{}",
       "created_at": "2026-11-18T05:35:50+00:00"
+    },
+    {
+      "id": 30,
+      "item_id": 14,
+      "role": "gallery",
+      "session_id": "602fba58",
+      "rel_path": "images/14/29df5d06abfb4779ac4842239a976fe2.jpg",
+      "thumb_rel_path": "thumbs/29df5d06abfb4779ac4842239a976fe2.jpg",
+      "mask_rel_path": "masks/29df5d06abfb4779ac4842239a976fe2.png",
+      "sha256": "f9ac764f7480a10b664d21c993bc355031ff91de21e02a441b2b6aebba40459b",
+      "width": 1280,
+      "height": 720,
+      "hand_found": 0,
+      "mask_found": 1,
+      "mask_status": "ok",
+      "localization_json": "{}",
+      "created_at": "2026-11-18T08:59:37+00:00"
+    },
+    {
+      "id": 31,
+      "item_id": 14,
+      "role": "gallery",
+      "session_id": "602fba58",
+      "rel_path": "images/14/9b951e36a87a47f485e4d502f79f81ba.jpg",
+      "thumb_rel_path": "thumbs/9b951e36a87a47f485e4d502f79f81ba.jpg",
+      "mask_rel_path": "masks/9b951e36a87a47f485e4d502f79f81ba.png",
+      "sha256": "ce581dfefa504adc30be8afffaad36d4b11d94af74a6de0219e0d3e25cbd1873",
+      "width": 1280,
+      "height": 720,
+      "hand_found": 0,
+      "mask_found": 1,
+      "mask_status": "ok",
+      "localization_json": "{}",
+      "created_at": "2026-11-18T08:59:46+00:00"
+    },
+    {
+      "id": 32,
+      "item_id": 14,
+      "role": "gallery",
+      "session_id": "602fba58",
+      "rel_path": "images/14/36e51dfba644408ebf23dc27d1bbb489.jpg",
+      "thumb_rel_path": "thumbs/36e51dfba644408ebf23dc27d1bbb489.jpg",
+      "mask_rel_path": "masks/36e51dfba644408ebf23dc27d1bbb489.png",
+      "sha256": "a26bf8a64da0d4ca5fe7e00c769616d78f3a1b598535c95e6baea36dd53043c5",
+      "width": 1280,
+      "height": 720,
+      "hand_found": 0,
+      "mask_found": 1,
+      "mask_status": "ok",
+      "localization_json": "{}",
+      "created_at": "2026-11-18T08:59:58+00:00"
+    },
+    {
+      "id": 33,
+      "item_id": 14,
+      "role": "gallery",
+      "session_id": "602fba58",
+      "rel_path": "images/14/706379241607414e9bdf0451ddef8496.jpg",
+      "thumb_rel_path": "thumbs/706379241607414e9bdf0451ddef8496.jpg",
+      "mask_rel_path": "masks/706379241607414e9bdf0451ddef8496.png",
+      "sha256": "5334e8e5b402049279d1071ad6562a81c60c60426b7c22729ac60358acbd1872",
+      "width": 1280,
+      "height": 720,
+      "hand_found": 0,
+      "mask_found": 1,
+      "mask_status": "ok",
+      "localization_json": "{}",
+      "created_at": "2026-11-18T09:00:08+00:00"
+    },
+    {
+      "id": 34,
+      "item_id": 15,
+      "role": "gallery",
+      "session_id": "602fba58",
+      "rel_path": "images/15/c02964984d0d49c2b2ed987b5e871ddd.jpg",
+      "thumb_rel_path": "thumbs/c02964984d0d49c2b2ed987b5e871ddd.jpg",
+      "mask_rel_path": "masks/c02964984d0d49c2b2ed987b5e871ddd.png",
+      "sha256": "c3a562acdf480b5464d17fbe195ad9610a01bc3f3673b1db382ea40cdf1a0dbf",
+      "width": 1280,
+      "height": 720,
+      "hand_found": 0,
+      "mask_found": 1,
+      "mask_status": "ok",
+      "localization_json": "{}",
+      "created_at": "2026-11-18T09:00:25+00:00"
+    },
+    {
+      "id": 35,
+      "item_id": 15,
+      "role": "gallery",
+      "session_id": "602fba58",
+      "rel_path": "images/15/f9803c72ceb24321b2b89ba1408b2d03.jpg",
+      "thumb_rel_path": "thumbs/f9803c72ceb24321b2b89ba1408b2d03.jpg",
+      "mask_rel_path": "masks/f9803c72ceb24321b2b89ba1408b2d03.png",
+      "sha256": "cbbe72bfc01eb701f134f6f1c98684f986f61414ce45c415b8fc0593b32512d5",
+      "width": 1280,
+      "height": 720,
+      "hand_found": 0,
+      "mask_found": 1,
+      "mask_status": "ok",
+      "localization_json": "{}",
+      "created_at": "2026-11-18T09:00:32+00:00"
+    },
+    {
+      "id": 36,
+      "item_id": 15,
+      "role": "gallery",
+      "session_id": "602fba58",
+      "rel_path": "images/15/b7c67b187170491dbe2952218ed63d81.jpg",
+      "thumb_rel_path": "thumbs/b7c67b187170491dbe2952218ed63d81.jpg",
+      "mask_rel_path": "masks/b7c67b187170491dbe2952218ed63d81.png",
+      "sha256": "ed0eac8f9ee42eb75dc0eae20c029184493bb3fb5e7f471297ae68e8fd78a806",
+      "width": 1280,
+      "height": 720,
+      "hand_found": 0,
+      "mask_found": 1,
+      "mask_status": "ok",
+      "localization_json": "{}",
+      "created_at": "2026-11-18T09:00:37+00:00"
+    },
+    {
+      "id": 37,
+      "item_id": 15,
+      "role": "gallery",
+      "session_id": "602fba58",
+      "rel_path": "images/15/70c491578b864824a57943bc61a67bde.jpg",
+      "thumb_rel_path": "thumbs/70c491578b864824a57943bc61a67bde.jpg",
+      "mask_rel_path": "masks/70c491578b864824a57943bc61a67bde.png",
+      "sha256": "8f297c704c22fb0c60a5b5be4c0a587a4e8e6676200789c79f010065020587e2",
+      "width": 1280,
+      "height": 720,
+      "hand_found": 0,
+      "mask_found": 1,
+      "mask_status": "ok",
+      "localization_json": "{}",
+      "created_at": "2026-11-18T09:00:48+00:00"
     }
   ]
 }
